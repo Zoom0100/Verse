@@ -493,10 +493,25 @@ button:disabled {
 #maintenance {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: 40;
   display: grid;
   place-items: center;
   background: #14110e;
+}
+
+#maintenance:not(.hidden) {
+  pointer-events: auto;
+}
+
+#maintenance .panel {
+  max-width: min(420px, 88vw);
+  padding: 28px 22px;
+  text-align: center;
+  color: #f4f1ea;
+}
+
+#menu [data-open="admin"].hidden {
+  display: none !important;
 }
 
 #admin textarea,

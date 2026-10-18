@@ -6805,14 +6805,111 @@ const BAN_KEY = "zv-bans";
 const maintenance = JSON.parse(localStorage.getItem(MAINT_KEY) || "null") || {
   on: false,
   text: t("maintDefault"),
+  owners: [],
 };
+let maintOwner = false;
+let gameLocked = false;
+let gameStarted = false;
+
+function tgUid() {
+  const u = window.Telegram?.WebApp?.initDataUnsafe?.user;
+  return u?.id != null ? String(u.id) : "";
+}
+
+function tgUserLabel() {
+  const u = window.Telegram?.WebApp?.initDataUnsafe?.user;
+  if (!u) return "";
+  return u.username ? `@${u.username}` : [u.first_name, u.last_name].filter(Boolean).join(" ") || String(u.id);
+}
+
+function persistMaintLocal() {
+  localStorage.setItem(
+    MAINT_KEY,
+    JSON.stringify({ on: maintenance.on, text: maintenance.text, owners: maintenance.owners || [] }),
+  );
+}
+
+function setAdminVisible(on) {
+  const btn = document.querySelector('#menu [data-open="admin"]');
+  if (btn) btn.classList.toggle("hidden", !on);
+  if (!on) document.getElementById("admin")?.classList.add("hidden");
+}
 
 function applyMaintenance() {
-  document.getElementById("maintenance").classList.add("hidden");
+  const locked = !!(maintenance.on && !maintOwner);
+  gameLocked = locked;
+  const gate = document.getElementById("maintenance");
   const note = document.getElementById("maint-note");
+  const msg = maintenance.text || t("maintDefault");
+  document.getElementById("maintenance-text").textContent = msg;
+  gate.classList.toggle("hidden", !locked);
   note.textContent = t("maintLive");
-  note.classList.toggle("hidden", !maintenance.on);
-  document.getElementById("maintenance-text").textContent = maintenance.text || t("maintDefault");
+  note.classList.toggle("hidden", !(maintenance.on && maintOwner));
+  setAdminVisible(maintOwner);
+  if (locked) {
+    document.getElementById("boot")?.classList.add("hidden");
+    try {
+      window.Telegram?.WebApp?.MainButton?.hide?.();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+async function fetchMaintenance() {
+  const uid = tgUid();
+  try {
+    const res = await fetch(`/api/maint?uid=${encodeURIComponent(uid)}&t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("maint_http");
+    const data = await res.json();
+    maintenance.on = !!data.on;
+    maintenance.text = data.text || t("maintDefault");
+    maintenance.owners = Array.isArray(data.owners) ? data.owners.map(String) : [];
+    maintOwner = !!data.isOwner;
+    persistMaintLocal();
+    applyMaintenance();
+    return true;
+  } catch {
+    const uidNow = tgUid();
+    const owners = Array.isArray(maintenance.owners) ? maintenance.owners.map(String) : [];
+    maintOwner = !!(uidNow && owners.includes(uidNow));
+    applyMaintenance();
+    return false;
+  }
+}
+
+async function pushMaintenance() {
+  const uid = tgUid();
+  if (!uid) {
+    persistMaintLocal();
+    applyMaintenance();
+    return false;
+  }
+  try {
+    const res = await fetch("/api/maint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        on: maintenance.on,
+        text: maintenance.text,
+        uid,
+        name: tgUserLabel(),
+      }),
+    });
+    if (!res.ok) throw new Error("maint_push");
+    const data = await res.json();
+    maintenance.on = !!data.on;
+    maintenance.text = data.text || maintenance.text;
+    maintenance.owners = Array.isArray(data.owners) ? data.owners.map(String) : maintenance.owners;
+    maintOwner = true;
+    persistMaintLocal();
+    applyMaintenance();
+    return true;
+  } catch {
+    persistMaintLocal();
+    applyMaintenance();
+    return false;
+  }
 }
 
 function renderAdminLog() {
@@ -6842,18 +6939,28 @@ function setupAdmin() {
   toggle.checked = maintenance.on;
   if (isDefaultMaint(maintenance.text)) maintenance.text = t("maintDefault");
   text.value = maintenance.text;
+  const hint = panel.querySelector(".mirror-hint");
+  const me = tgUid();
+  if (hint && me) hint.textContent = `${t("adminHint")} · ID ${me}`;
   applyMaintenance();
   renderAdminLog();
   document.getElementById("admin-close").addEventListener("click", () => panel.classList.add("hidden"));
-  toggle.addEventListener("change", () => {
+  toggle.addEventListener("change", async () => {
+    if (!maintOwner && !tgUid()) {
+      toggle.checked = maintenance.on;
+      return;
+    }
     maintenance.on = toggle.checked;
     maintenance.text = text.value.trim() || maintenance.text;
-    localStorage.setItem(MAINT_KEY, JSON.stringify(maintenance));
+    const ok = await pushMaintenance();
+    if (!ok && maintenance.on) {
+      /* local fallback only affects this device */
+    }
     applyMaintenance();
   });
-  document.getElementById("maint-save").addEventListener("click", () => {
+  document.getElementById("maint-save").addEventListener("click", async () => {
     maintenance.text = text.value.trim() || t("maintDefault");
-    localStorage.setItem(MAINT_KEY, JSON.stringify(maintenance));
+    await pushMaintenance();
     applyMaintenance();
   });
   document.getElementById("admin-plaza").addEventListener("click", () => {
@@ -7117,6 +7224,7 @@ function setupShell() {
   document.querySelectorAll("[data-open]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = btn.dataset.open;
+      if (id === "admin" && !maintOwner) return;
       closePops();
       if (id === "wardrobe") {
         setBagOpen(false);
@@ -7171,6 +7279,9 @@ function setupShell() {
 
 setupAdmin();
 setupShell();
+setInterval(() => {
+  fetchMaintenance();
+}, 15000);
 
 let clickCtx;
 let shotNoise;
@@ -7397,6 +7508,10 @@ let phoneTick = 0;
 let phoneHeavy = 0;
 
 function tick() {
+  if (gameLocked) {
+    requestAnimationFrame(tick);
+    return;
+  }
   const dt = Math.min(clock.getDelta(), 0.04);
   const now = clock.elapsedTime;
   phoneTick += 1;
@@ -7837,9 +7952,18 @@ runBtn.addEventListener("pointerup", (e) => {
 });
 clock.start();
 renderHotbar();
-tick();
 
-boot().catch((err) => {
-  console.error(err);
-  setLoad(t("bootErr"));
-});
+(async () => {
+  await fetchMaintenance();
+  if (gameLocked) {
+    document.getElementById("boot")?.classList.add("hidden");
+    tick();
+    return;
+  }
+  gameStarted = true;
+  tick();
+  boot().catch((err) => {
+    console.error(err);
+    setLoad(t("bootErr"));
+  });
+})();
