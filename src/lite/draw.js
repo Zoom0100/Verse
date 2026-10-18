@@ -56,20 +56,12 @@ export function drawTile(ctx, id, x, y, time = 0) {
       rect(ctx, x + ((time * 0.002) | 0) % 4, y + 5, 6, 1, C.water2);
       break;
     case 4:
-      rect(ctx, x, y, TILE, TILE, C.stone);
-      rect(ctx, x, y, TILE, 2, "#4e5660");
+      rect(ctx, x, y, TILE, TILE, "#3e4650");
       break;
     case 5:
-      rect(ctx, x, y, TILE, TILE, C.brick);
-      rect(ctx, x, y, TILE, 3, C.roof);
-      rect(ctx, x + 3, y + 6, 4, 4, C.glass);
-      rect(ctx, x + 9, y + 6, 4, 4, C.glass);
-      break;
     case 6:
-      rect(ctx, x, y, TILE, TILE, C.brick);
-      rect(ctx, x, y, TILE, 3, C.roof);
-      rect(ctx, x + 4, y + 5, 8, 11, C.door);
-      px(ctx, x + 10, y + 11, C.lamp);
+      rect(ctx, x, y, TILE, TILE, "#3a4550");
+      rect(ctx, x + 2, y + 2, 12, 12, "#2c3640");
       break;
     case 7:
       rect(ctx, x, y, TILE, TILE, ((x / TILE) | 0) % 2 === ((y / TILE) | 0) % 2 ? C.floor : C.floor2);
@@ -108,62 +100,107 @@ export function drawTile(ctx, id, x, y, time = 0) {
   }
 }
 
-/** Soft stylized actor — seen from facing direction (2.5D lite). */
+/** Building faces rise above the footprint so the camera reads as third person. */
+export function drawFacade(ctx, id, x, y) {
+  if (id === 4) {
+    rect(ctx, x, y - 8, TILE, 10, C.stone);
+    rect(ctx, x, y - 8, TILE, 3, "#8b939c");
+    rect(ctx, x, y, TILE, 2, "#2a3138");
+    return;
+  }
+  if (id === 5 || id === 6) {
+    rect(ctx, x, y - 26, TILE, 28, C.brick);
+    rect(ctx, x - 1, y - 30, TILE + 2, 6, C.roof);
+    rect(ctx, x, y - 24, TILE, 3, "#8eb4c6");
+    if (id === 6) {
+      rect(ctx, x + 4, y - 16, 8, 18, C.door);
+      rect(ctx, x + 10, y - 8, 2, 2, C.lamp);
+    } else {
+      rect(ctx, x + 2, y - 16, 5, 6, C.glass);
+      rect(ctx, x + 9, y - 16, 5, 6, C.glass);
+    }
+    rect(ctx, x, y, TILE, 2, "#2a3138");
+    return;
+  }
+  if (id === 8) {
+    rect(ctx, x, y - 18, TILE, 20, C.wall);
+    rect(ctx, x, y - 18, TILE, 4, "#eef3f6");
+    rect(ctx, x, y, TILE, 2, "#9aa7b2");
+  }
+}
+
+/** Third-person actor: tall, feet on the tile, seen from behind by default. */
 export function drawHero(ctx, sx, sy, face = 0, bob = 0, run = false) {
-  const y = sy + bob;
-  ctx.fillStyle = "rgba(10,16,22,0.28)";
+  const foot = sy + TILE;
+  const y = foot + bob;
+  const step = run ? 3 : 2;
+  const swing = Math.round(bob);
+
+  ctx.fillStyle = "rgba(10,16,22,0.35)";
   ctx.beginPath();
-  ctx.ellipse(sx + 8, sy + 15, 5, 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx + 8, foot - 1, 7, 3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // legs
-  rect(ctx, sx + 5, y + 11, 3, 5, C.pants);
-  rect(ctx, sx + 8, y + 11, 3, 5, C.pants);
-  // body
-  rect(ctx, sx + 4, y + 4, 8, 8, C.shirt);
-  // head
-  rect(ctx, sx + 5, y + 1, 6, 4, C.skin);
-  rect(ctx, sx + 4, y, 8, 2, C.hair);
+  rect(ctx, sx + 4, y - 16, 4, 10, C.pants);
+  rect(ctx, sx + 9, y - 16, 4, 10, C.pants);
+  rect(ctx, sx + 3, y - 7 + swing, 4, 3, "#1c242e");
+  rect(ctx, sx + 10, y - 7 - swing, 4, 3, "#1c242e");
+
+  rect(ctx, sx + 3, y - 30, 11, 16, C.shirt);
+  rect(ctx, sx + 1 - (face === 3 ? step : 0), y - 28, 3, 12, C.shirt);
+  rect(ctx, sx + 13 + (face === 1 ? step : 0), y - 28, 3, 12, C.shirt);
+  rect(ctx, sx + 1, y - 18, 3, 4, C.skin);
+  rect(ctx, sx + 13, y - 18, 3, 4, C.skin);
+
+  rect(ctx, sx + 4, y - 40, 9, 11, C.skin);
+  rect(ctx, sx + 3, y - 42, 11, 5, C.hair);
+  rect(ctx, sx + 3, y - 38, 2, 6, C.hair);
+  rect(ctx, sx + 12, y - 38, 2, 6, C.hair);
 
   if (face === 0) {
-    // back — default third-person feel
-    rect(ctx, sx + 5, y + 1, 6, 2, C.hair);
+    rect(ctx, sx + 4, y - 40, 9, 8, C.hair);
   } else if (face === 2) {
-    // front
-    px(ctx, sx + 6, y + 2, C.ink);
-    px(ctx, sx + 9, y + 2, C.ink);
+    px(ctx, sx + 6, y - 36, C.ink);
+    px(ctx, sx + 10, y - 36, C.ink);
+    rect(ctx, sx + 7, y - 33, 3, 1, "#c4897a");
   } else if (face === 1) {
-    // right
-    px(ctx, sx + 9, y + 2, C.ink);
-    if (run) rect(ctx, sx + 11, y + 6, 2, 4, C.skin);
+    rect(ctx, sx + 8, y - 40, 5, 8, C.hair);
+    px(ctx, sx + 11, y - 36, C.ink);
   } else {
-    // left
-    px(ctx, sx + 5, y + 2, C.ink);
-    if (run) rect(ctx, sx + 2, y + 6, 2, 4, C.skin);
+    rect(ctx, sx + 4, y - 40, 5, 8, C.hair);
+    px(ctx, sx + 5, y - 36, C.ink);
   }
 }
 
 export function drawNpc(ctx, sx, sy, bob = 0) {
-  const y = sy + bob;
-  ctx.fillStyle = "rgba(10,16,22,0.28)";
+  const foot = sy + TILE;
+  const y = foot + bob;
+  ctx.fillStyle = "rgba(10,16,22,0.35)";
   ctx.beginPath();
-  ctx.ellipse(sx + 8, sy + 15, 5, 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx + 8, foot - 1, 7, 3, 0, 0, Math.PI * 2);
   ctx.fill();
-  rect(ctx, sx + 5, y + 11, 6, 5, C.pants);
-  rect(ctx, sx + 4, y + 4, 8, 8, C.npc);
-  rect(ctx, sx + 5, y + 1, 6, 4, C.skin);
-  rect(ctx, sx + 4, y, 8, 2, "#3a2a22");
-  px(ctx, sx + 6, y + 2, C.ink);
-  px(ctx, sx + 9, y + 2, C.ink);
+  rect(ctx, sx + 4, y - 16, 8, 12, C.pants);
+  rect(ctx, sx + 3, y - 30, 11, 16, C.npc);
+  rect(ctx, sx + 4, y - 40, 9, 11, C.skin);
+  rect(ctx, sx + 3, y - 42, 11, 6, "#3a2a22");
+  px(ctx, sx + 6, y - 36, C.ink);
+  px(ctx, sx + 10, y - 36, C.ink);
 }
 
 export function drawTree(ctx, x, y) {
-  rect(ctx, x + 7, y + 10, 2, 6, C.trunk);
-  rect(ctx, x + 3, y + 2, 10, 9, C.leaf);
-  rect(ctx, x + 5, y + 1, 6, 2, C.grass);
+  rect(ctx, x + 6, y - 4, 4, 18, C.trunk);
+  rect(ctx, x + 1, y - 28, 14, 16, C.leaf);
+  rect(ctx, x + 3, y - 34, 10, 8, C.grass);
+  rect(ctx, x + 5, y - 38, 6, 6, C.leaf);
 }
 
 export function drawLamp(ctx, x, y, on) {
-  rect(ctx, x + 7, y + 6, 2, 10, "#4e5660");
-  rect(ctx, x + 4, y + 2, 8, 5, on ? C.lamp : C.stone);
+  rect(ctx, x + 7, y - 18, 2, 32, "#4e5660");
+  rect(ctx, x + 3, y - 26, 10, 8, on ? C.lamp : C.stone);
+  if (on) {
+    ctx.fillStyle = "rgba(232,197,106,0.18)";
+    ctx.beginPath();
+    ctx.arc(x + 8, y - 22, 16, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }

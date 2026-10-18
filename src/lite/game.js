@@ -1,9 +1,7 @@
 import { MAPS, TILE, blocked, nearMarker, findMarker } from "./maps.js";
-import { C, drawTile, drawHero, drawNpc, drawTree, drawLamp, rect } from "./draw.js";
+import { C, drawTile, drawFacade, drawHero, drawNpc, drawTree, drawLamp, rect } from "./draw.js";
 
 const SAVE_KEY = "zv-lite-save";
-const VIEW_W = 320;
-const VIEW_H = 180;
 const OWNER_TG_ID = "8144744644";
 const OWNER_TG_NAME = "zoom0100";
 
@@ -24,7 +22,11 @@ export function createGame(canvas, ui) {
   let interact = null;
   let phoneOpen = false;
   let menuOpen = false;
-  let scale = 1;
+  let viewW = 390;
+  let viewH = 700;
+  let camX = 0;
+  let camY = 0;
+  let camReady = false;
   let maintOwner = false;
   let maintOn = false;
 
@@ -81,24 +83,28 @@ export function createGame(canvas, ui) {
   }
 
   function fit() {
-    const ww = window.innerWidth;
-    const wh = window.innerHeight;
-    scale = Math.max(1, Math.floor(Math.min(ww / VIEW_W, wh / VIEW_H)));
-    const cw = VIEW_W * scale;
-    const ch = VIEW_H * scale;
-    canvas.width = VIEW_W;
-    canvas.height = VIEW_H;
-    canvas.style.width = `${cw}px`;
-    canvas.style.height = `${ch}px`;
-    canvas.style.left = `${Math.floor((ww - cw) / 2)}px`;
-    canvas.style.top = `${Math.floor((wh - ch) / 2)}px`;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    viewW = Math.max(2, Math.floor(window.innerWidth * dpr));
+    viewH = Math.max(2, Math.floor(window.innerHeight * dpr));
+    canvas.width = viewW;
+    canvas.height = viewH;
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+    canvas.style.left = "0";
+    canvas.style.top = "0";
     ctx.imageSmoothingEnabled = false;
+  }
+
+  function frameZoom() {
+    const long = Math.max(viewW, viewH);
+    return long / (11 * TILE);
   }
 
   function setMap(next, spawn) {
     map = next;
     player.x = spawn?.x ?? next.spawn.x;
     player.y = spawn?.y ?? next.spawn.y;
+    camReady = false;
     showPlace(next.name);
     save();
   }
@@ -280,45 +286,93 @@ export function createGame(canvas, ui) {
     else if (vitals.life < 1) vitals.life = Math.min(1, vitals.life + dt * 0.002);
   }
 
-  function drawWorld(time) {
-    const camX = Math.max(0, Math.min(map.w * TILE - VIEW_W, player.x * TILE - VIEW_W / 2 + 8));
-    const camY = Math.max(0, Math.min(map.h * TILE - VIEW_H, player.y * TILE - VIEW_H / 2 + 8));
-    rect(ctx, 0, 0, VIEW_W, VIEW_H, map.id === "house" ? "#2a3340" : C.sky);
+  function drawWorld(time, dt) {
+    const zoom = frameZoom();
+    const worldW = viewW / zoom;
+    const worldH = viewH / zoom;
+    const ahead = [
+      { x: 0, y: -TILE * 1.5 },
+      { x: TILE * 1.5, y: 0 },
+      { x: 0, y: TILE * 1.5 },
+      { x: -TILE * 1.5, y: 0 },
+    ][player.face] || { x: 0, y: -TILE };
+    const feetX = player.x * TILE + TILE * 0.5;
+    const feetY = player.y * TILE + TILE;
+    let targetX = feetX + ahead.x * 0.4 - worldW * 0.5;
+    let targetY = feetY + ahead.y * 0.4 - worldH * 0.66;
+    const mapW = map.w * TILE;
+    const mapH = map.h * TILE;
+    if (mapW <= worldW) targetX = (mapW - worldW) / 2;
+    else targetX = Math.max(0, Math.min(mapW - worldW, targetX));
+    if (mapH <= worldH) targetY = (mapH - worldH) / 2;
+    else targetY = Math.max(0, Math.min(mapH - worldH, targetY));
+    if (!camReady) {
+      camX = targetX;
+      camY = targetY;
+      camReady = true;
+    } else {
+      const k = Math.min(1, dt * 7);
+      camX += (targetX - camX) * k;
+      camY += (targetY - camY) * k;
+    }
+
+    ctx.setTransform(zoom, 0, 0, zoom, 0, 0);
+    rect(ctx, 0, 0, worldW, worldH, map.id === "house" ? "#2a3340" : C.sky);
 
     const x0 = Math.max(0, Math.floor(camX / TILE) - 1);
-    const y0 = Math.max(0, Math.floor(camY / TILE) - 1);
-    const x1 = Math.min(map.w - 1, Math.ceil((camX + VIEW_W) / TILE) + 1);
-    const y1 = Math.min(map.h - 1, Math.ceil((camY + VIEW_H) / TILE) + 1);
+    const y0 = Math.max(0, Math.floor(camY / TILE) - 2);
+    const x1 = Math.min(map.w - 1, Math.ceil((camX + worldW) / TILE) + 1);
+    const y1 = Math.min(map.h - 1, Math.ceil((camY + worldH) / TILE) + 1);
 
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
-        drawTile(ctx, map.tiles[ty * map.w + tx], Math.floor(tx * TILE - camX), Math.floor(ty * TILE - camY), time);
+        drawTile(ctx, map.tiles[ty * map.w + tx], tx * TILE - camX, ty * TILE - camY, time);
       }
     }
 
+    const stack = [];
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const id = map.tiles[ty * map.w + tx];
+        if (id === 4 || id === 5 || id === 6 || id === 8) {
+          stack.push({ z: (ty + 1) * TILE, kind: "facade", id, x: tx * TILE, y: ty * TILE });
+        }
+      }
+    }
     if (map.id === "plaza") {
-      drawTree(ctx, Math.floor(8 * TILE - camX), Math.floor(6 * TILE - camY));
-      drawTree(ctx, Math.floor(28 * TILE - camX), Math.floor(8 * TILE - camY));
-      drawLamp(ctx, Math.floor(14 * TILE - camX), Math.floor(7 * TILE - camY), true);
-      drawLamp(ctx, Math.floor(24 * TILE - camX), Math.floor(15 * TILE - camY), true);
+      stack.push({ z: 7 * TILE, kind: "tree", x: 8 * TILE, y: 6 * TILE });
+      stack.push({ z: 9 * TILE, kind: "tree", x: 28 * TILE, y: 8 * TILE });
+      stack.push({ z: 8 * TILE, kind: "lamp", x: 14 * TILE, y: 7 * TILE });
+      stack.push({ z: 16 * TILE, kind: "lamp", x: 24 * TILE, y: 15 * TILE });
       for (const n of npcs) {
-        drawNpc(ctx, Math.floor(n.x * TILE - camX), Math.floor(n.y * TILE - camY), Math.sin(time * 0.004));
+        stack.push({ z: n.y * TILE + TILE, kind: "npc", x: n.x * TILE, y: n.y * TILE, bob: Math.sin(time * 0.004) });
       }
     }
+    stack.push({
+      z: player.y * TILE + TILE,
+      kind: "hero",
+      x: player.x * TILE,
+      y: player.y * TILE,
+    });
+    stack.sort((a, b) => a.z - b.z);
 
-    drawHero(
-      ctx,
-      Math.floor(player.x * TILE - camX),
-      Math.floor(player.y * TILE - camY),
-      player.face,
-      player.bob,
-      player.running && player.moving,
-    );
+    for (const item of stack) {
+      const sx = item.x - camX;
+      const sy = item.y - camY;
+      if (item.kind === "facade") drawFacade(ctx, item.id, sx, sy);
+      else if (item.kind === "tree") drawTree(ctx, sx, sy);
+      else if (item.kind === "lamp") drawLamp(ctx, sx, sy, true);
+      else if (item.kind === "npc") drawNpc(ctx, sx, sy, item.bob);
+      else {
+        drawHero(ctx, sx, sy, player.face, player.bob, player.running && player.moving);
+      }
+    }
 
     if (vitals.hunger < 0.12 || vitals.thirst < 0.12) {
       ctx.fillStyle = "rgba(40,40,40,0.2)";
-      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.fillRect(0, 0, worldW, worldH);
     }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
   let last = performance.now();
@@ -347,7 +401,7 @@ export function createGame(canvas, ui) {
     }
 
     refreshHud();
-    if (!(maintOn && !maintOwner)) drawWorld(now);
+    if (!(maintOn && !maintOwner)) drawWorld(now, dt);
 
     saveAcc += dt;
     if (saveAcc > 4) {
@@ -487,7 +541,7 @@ export function createGame(canvas, ui) {
   bind();
   refreshHud();
   showPlace(map.name);
-  toast("Zoom Verse Lite · 2D fluido");
+  toast("Terza persona · schermo intero");
   syncMaint();
   setInterval(syncMaint, 15000);
   requestAnimationFrame(frame);
