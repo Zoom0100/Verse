@@ -38,7 +38,7 @@ export function createCity(api) {
     scene, camera, renderer, player, npcs, groundAt, addBlock, getZcoin, setZcoin, saveZcoin, look, benches = [],
     addToBag, bagRoom, listOres, sellOres, orePay = {}, quarry, importAt, addCircle,
     hasRod, listFish, sellFish, fishPay = {}, buyRod, hasSkate, buySkate, buyAmmo, marketAt, pescaAt, atelierAt, lakes = [], listBag = () => [],
-    hasItem, takeOne, getHeld, circles = [], openAtelier,
+    hasItem, takeOne, getHeld, circles = [], openAtelier, lite = false,
   } = api;
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
@@ -109,13 +109,26 @@ export function createCity(api) {
   const plaster = mat(0xf3efe6);
   const stone = mat(0xd7d0c4);
   const wood = mat(0x8d5a3c);
-  const glass = new THREE.MeshPhysicalMaterial({
-    color: 0xd5e7f5,
-    roughness: 0.08,
-    metalness: 0.02,
-    transparent: true,
-    opacity: 0.45,
-  });
+  const glass = lite
+    ? new THREE.MeshStandardMaterial({
+        color: 0xd5e7f5,
+        roughness: 0.35,
+        metalness: 0.05,
+        transparent: true,
+        opacity: 0.4,
+      })
+    : new THREE.MeshPhysicalMaterial({
+        color: 0xd5e7f5,
+        roughness: 0.08,
+        metalness: 0.02,
+        transparent: true,
+        opacity: 0.45,
+      });
+  function addLiteLight(parent, light) {
+    if (lite) return null;
+    parent.add(light);
+    return light;
+  }
 
   function box(w, h, d, material, x, y, z) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
@@ -954,7 +967,7 @@ export function createCity(api) {
     group.add(bell);
     const lamp = new THREE.PointLight(bank ? 0xffe0b0 : 0xd7ecff, 7, 14, 2);
     lamp.position.set(0, 3.4, 0);
-    group.add(lamp);
+    addLiteLight(group, lamp);
 
     blockLocal(-hw, hw, hd - 0.2, hd + 0.2);
     blockLocal(-hw - 0.2, -hw + 0.2, -hd, hd);
@@ -1260,7 +1273,7 @@ export function createCity(api) {
       bulb.userData.noTint = true;
       const lamp = new THREE.PointLight(0xffe2b0, 1.6, 5.5, 2);
       lamp.position.y = 0.95;
-      group.add(lamp);
+      addLiteLight(group, lamp);
     } else if (id.startsWith("quadro")) {
       const palette = {
         quadro1: ["#1d4e89", "#7ec8e3", "#e7d7b8"],
@@ -2325,6 +2338,7 @@ export function createCity(api) {
   keyPivot.add(keyShaft, keyHead);
   car.add(keyPivot);
   function carLamp(x) {
+    if (lite) return { intensity: 0 };
     const spot = new THREE.SpotLight(0xfff1cc, 0, 22, 0.52, 0.42, 1.3);
     spot.position.set(x, 0.64, 1.9);
     const target = new THREE.Object3D();
@@ -3717,7 +3731,7 @@ export function createCity(api) {
     dressRoom(cx, cz, y0, "import");
     const porch = new THREE.PointLight(0xffe0b0, 6, 11, 2);
     porch.position.set(cx, y0 + 2.4, cz);
-    scene.add(porch);
+    addLiteLight(scene, porch);
     hinge(cx - 1.22, cz - 3.52, 0, 1.45, new THREE.Vector3(cx, 0, cz - 3.4), 1.26, null, 2.46);
     hinge(cx + 1.22, cz - 3.52, Math.PI, -1.45, new THREE.Vector3(cx, 0, cz - 3.4), 1.26, null, 2.46);
     addBlock(cx - 4.7, cx - 4.3, cz - 3.5, cz + 3.5);
@@ -3844,7 +3858,7 @@ export function createCity(api) {
       scene.add(lampShade);
       const roomLamp = new THREE.PointLight(0xffe2b0, 4, 6, 2);
       roomLamp.position.set(cx + 0.2, y0 + 1.7, cz - 1.4);
-      scene.add(roomLamp);
+      addLiteLight(scene, roomLamp);
     }
     if (kind === "market") {
       box(0.7, 1.35, 0.62, steel, cx + 2.5, y0 + 0.75, cz + 1.55);
@@ -3925,7 +3939,7 @@ export function createCity(api) {
     }
     const lamp = new THREE.PointLight(spec.light, 5, 9, 2);
     lamp.position.set(cx, y0 + 2.3, cz);
-    scene.add(lamp);
+    addLiteLight(scene, lamp);
     dressRoom(cx, cz, y0, spec.title === "ZC MARKET" ? "market" : "pesca");
     hinge(cx - 1.22, cz - 3.18, 0, 1.45, new THREE.Vector3(cx, 0, cz - 3.05), 1.26, null, 2.22);
     hinge(cx + 1.22, cz - 3.18, Math.PI, -1.45, new THREE.Vector3(cx, 0, cz - 3.05), 1.26, null, 2.22);
@@ -4154,7 +4168,7 @@ export function createCity(api) {
     }
     const lamp = new THREE.PointLight(0xffd0c8, 6, 10, 2);
     lamp.position.set(cx, y0 + 2.35, cz);
-    scene.add(lamp);
+    addLiteLight(scene, lamp);
     hinge(cx - 1.22, cz + 3.18, 0, 1.45, new THREE.Vector3(cx, 0, cz + 3.05), 1.26, null, 2.22);
     hinge(cx + 1.22, cz + 3.18, Math.PI, -1.45, new THREE.Vector3(cx, 0, cz + 3.05), 1.26, null, 2.22);
     addBlock(cx - 4.2, cx - 3.8, cz - 3.2, cz + 3.2);
