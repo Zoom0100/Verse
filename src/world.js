@@ -1059,22 +1059,26 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
       skyU.rayleigh.value = 0.02 + day * 1.08 - weather.cover * 0.1;
       skyU.mieCoefficient.value = 0.001 + weather.cover * 0.004 + (h > 16 && h < 20 ? 0.006 : 0);
 
-      renderer.toneMappingExposure = THREE.MathUtils.lerp(0.26, 1.08, day) * weather.dim + flash * 0.4;
-      scene.environmentIntensity = THREE.MathUtils.lerp(0.08, 1.2, day);
-      sunLight.intensity = THREE.MathUtils.lerp(0, 2.15, day) * weather.dim + flash * 2.2;
+      // Phone/plainSky: never go pitch-black (no full street-light grid).
+      const nightFloor = plainSky ? 0.42 : 0.26;
+      const hemiFloor = plainSky ? 0.38 : 0.05;
+      const fillFloor = plainSky ? 0.18 : 0.03;
+      renderer.toneMappingExposure = THREE.MathUtils.lerp(nightFloor, 1.08, day) * weather.dim + flash * 0.4;
+      scene.environmentIntensity = THREE.MathUtils.lerp(plainSky ? 0.35 : 0.08, 1.2, day);
+      sunLight.intensity = THREE.MathUtils.lerp(plainSky ? 0.35 : 0, 2.15, day) * weather.dim + flash * 2.2;
       sunLight.position.set(ux, uy, uz).multiplyScalar(80);
       sunLight.target.position.set(player.group.position.x, 0, player.group.position.z);
-      sunColor.set(day > 0.55 ? 0xfff1d6 : 0xffb07a);
+      sunColor.set(day > 0.55 ? 0xfff1d6 : plainSky ? 0xc8d4ea : 0xffb07a);
       sunLight.color.copy(sunColor);
       moonLight.position.set(-ux, -uy, -uz).multiplyScalar(80);
-      moonLight.intensity = THREE.MathUtils.lerp(0.16, 0, day) * (weather.kind === "storm" ? 0.45 : 1);
-      if (fillLight) fillLight.intensity = THREE.MathUtils.lerp(0.03, 0.34, day);
-      hemiLight.intensity = THREE.MathUtils.lerp(0.05, 0.8, day);
-      hemiSky.set(night > 0.55 ? 0x162033 : 0xcfe8ff);
-      hemiGround.set(night > 0.55 ? 0x14110e : 0x3d4a32);
+      moonLight.intensity = THREE.MathUtils.lerp(plainSky ? 0.55 : 0.16, 0, day) * (weather.kind === "storm" ? 0.45 : 1);
+      if (fillLight) fillLight.intensity = THREE.MathUtils.lerp(fillFloor, 0.34, day);
+      hemiLight.intensity = THREE.MathUtils.lerp(hemiFloor, 0.8, day);
+      hemiSky.set(night > 0.55 ? (plainSky ? 0x2a3a52 : 0x162033) : 0xcfe8ff);
+      hemiGround.set(night > 0.55 ? (plainSky ? 0x2a241c : 0x14110e) : 0x3d4a32);
       hemiLight.color.copy(hemiSky);
       hemiLight.groundColor.copy(hemiGround);
-      const lamp = night * (weather.kind === "storm" ? 0.85 : 1);
+      const lamp = Math.max(night, plainSky ? 0.35 : 0) * (weather.kind === "storm" ? 0.85 : 1);
       const px = player.group.position.x;
       const pz = player.group.position.z;
       if (!worldLampOrder || worldLampOrder.length !== streetLights.length) {
@@ -1091,15 +1095,15 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
         const bulb = streetLights[worldLampOrder[i]];
         const on = i < lampLimit && lamp > 0.02;
         bulb.visible = on;
-        if (on) bulb.intensity = 220 * lamp;
+        if (on) bulb.intensity = (plainSky ? 140 : 220) * lamp;
       }
       if (lampGlow) lampGlow.emissiveIntensity = 0.5 + lamp * 4.8;
-      fogColor.set(night > 0.55 ? 0x03050a : weather.cover > 0.6 ? 0xb7c6d4 : 0xc5d7ea);
+      fogColor.set(night > 0.55 ? (plainSky ? 0x1a2433 : 0x03050a) : weather.cover > 0.6 ? 0xb7c6d4 : 0xc5d7ea);
       if (day > 0.15 && day < 0.72 && h < 10) fogColor.lerp(dawnTint, 0.45);
       if (day > 0.15 && day < 0.72 && h > 16) fogColor.lerp(duskTint, 0.45);
       scene.fog.color.copy(fogColor);
-      scene.fog.density = THREE.MathUtils.lerp(0.00115, 0.0021, day) * (plainSky ? 1.55 : 1);
-      scene.background.copy(night > 0.45 ? nightSky : fogColor);
+      scene.fog.density = THREE.MathUtils.lerp(0.00115, 0.0021, day) * (plainSky ? 1.15 : 1);
+      scene.background.copy(night > 0.45 ? (plainSky ? fogColor : nightSky) : fogColor);
       const starFade = 1 - THREE.MathUtils.smoothstep(elev, -0.28, 0.06);
       starFields.forEach((field, i) => {
         field.material.opacity = starFade * (i === starFields.length - 1 ? 0.55 : 0.95);

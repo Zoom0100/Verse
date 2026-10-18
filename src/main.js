@@ -51,15 +51,15 @@ renderer.setPixelRatio(fitRatio());
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.shadowMap.enabled = !phone;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = phone ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = phone ? 1 : 1.15;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9ec9ef);
-// Denser fog on phone hides far mesh and saves fill.
-scene.fog = new THREE.FogExp2(0xc5d7ea, phone ? 0.011 : 0.0024);
+// Milder fog on phone: hide far mesh without swallowing the scene.
+scene.fog = new THREE.FogExp2(0xc5d7ea, phone ? 0.0048 : 0.0024);
 if (!phone) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -7751,7 +7751,7 @@ const world = createWorld({
   fillLight: lights.fill,
   streetLights,
   lampGlow,
-  lampLimit: phone ? 0 : 8,
+  lampLimit: phone ? 2 : 8,
   plainSky: phone,
   addCircle,
   lakes: LAKES,
