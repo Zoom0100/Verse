@@ -37,29 +37,36 @@ const phone =
   (window.matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 1000);
 function fitRatio() {
   if (!phone) return Math.min(window.devicePixelRatio, 1.5);
+  // After cutting world load, aim ~720px long side (was 512: ugly, still heavy).
   const long = Math.max(window.innerWidth, window.innerHeight, 1);
-  return Math.min(1, 512 / long);
+  return Math.min(1.15, 720 / long);
 }
-const renderer = new THREE.WebGLRenderer({ antialias: !phone, powerPreference: "high-performance" });
+const renderer = new THREE.WebGLRenderer({
+  antialias: !phone,
+  powerPreference: "high-performance",
+  stencil: false,
+  depth: true,
+});
 renderer.setPixelRatio(fitRatio());
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.shadowMap.enabled = !phone;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMapping = phone ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = phone ? 1 : 1.15;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9ec9ef);
-scene.fog = new THREE.FogExp2(0xc5d7ea, 0.0024);
+// Denser fog on phone hides far mesh and saves fill.
+scene.fog = new THREE.FogExp2(0xc5d7ea, phone ? 0.011 : 0.0024);
 if (!phone) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   pmrem.dispose();
 }
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, phone ? 200 : 400);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, phone ? 72 : 400);
 if (phone) document.body.classList.add("phone");
 const clock = new THREE.Clock();
 const loader = new GLTFLoader();
@@ -959,20 +966,24 @@ function addGarden() {
     addCircle(x, z, 0.42);
   }
 
-  for (let i = 0; i < 26; i++) {
-    const a = (i / 26) * Math.PI * 2 + 0.15;
+  const ringTrees = phone ? 8 : 26;
+  for (let i = 0; i < ringTrees; i++) {
+    const a = (i / ringTrees) * Math.PI * 2 + 0.15;
     const r = 28.2 + (i % 4) * 2.4;
     addTree(Math.cos(a) * r, Math.sin(a) * r, a);
   }
-  for (let i = 0; i < 7; i++) {
+  const avenueTrees = phone ? 3 : 7;
+  for (let i = 0; i < avenueTrees; i++) {
     const z = 26 + i * 3.15;
     addTree(-6.35, z, i * 0.7);
     addTree(6.35, z, i * 0.7 + 1.2);
   }
-  for (let i = 0; i < 42; i++) {
-    const a = (i / 42) * Math.PI * 2 + 0.2;
-    const r = 64 + (i % 5) * 6.2;
-    addTree(Math.cos(a) * r, Math.sin(a) * r, a * 1.7);
+  if (!phone) {
+    for (let i = 0; i < 42; i++) {
+      const a = (i / 42) * Math.PI * 2 + 0.2;
+      const r = 64 + (i % 5) * 6.2;
+      addTree(Math.cos(a) * r, Math.sin(a) * r, a * 1.7);
+    }
   }
   function rowTrees(x0, z0, x1, z1, step, side) {
     const len = Math.hypot(x1 - x0, z1 - z0);
@@ -1092,42 +1103,44 @@ function addGarden() {
     scene.add(lamp);
     addCircle(x, z, 0.2);
   }
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 + 0.18;
+  for (let i = 0; i < (phone ? 4 : 8); i++) {
+    const a = (i / (phone ? 4 : 8)) * Math.PI * 2 + 0.18;
     const x = Math.cos(a) * 13.6;
     const z = Math.sin(a) * 13.6;
     if (Math.abs(x) < 1.4 && z > 8) continue;
     addLamp(x, z, "lantern");
   }
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2 + 0.4;
-    let x = Math.cos(a) * 26.2;
-    let z = Math.sin(a) * 26.2;
-    if (avenueHere(x, z)) {
-      const len = Math.hypot(x, z) || 1;
-      x += (x / len) * 4;
-      z += (z / len) * 4;
+  if (!phone) {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.4;
+      let x = Math.cos(a) * 26.2;
+      let z = Math.sin(a) * 26.2;
+      if (avenueHere(x, z)) {
+        const len = Math.hypot(x, z) || 1;
+        x += (x / len) * 4;
+        z += (z / len) * 4;
+      }
+      addLamp(x, z);
     }
-    addLamp(x, z);
+    for (const z of [22, 31, 40, 49]) {
+      addLamp(-5.2, z, "avenue");
+      addLamp(5.2, z, "avenue");
+    }
+    for (const z of [-22, -29]) {
+      addLamp(-5.1, z, "avenue");
+      addLamp(5.1, z, "avenue");
+    }
+    for (const x of [22, 31]) {
+      addLamp(x, 5.2, "avenue");
+      addLamp(x, -5.2, "avenue");
+      addLamp(-x, 5.2, "avenue");
+      addLamp(-x, -5.2, "avenue");
+    }
+    addLamp(-36.4, 12.4);
+    addLamp(-31.6, 12.4);
+    addLamp(31.6, -12.4);
+    addLamp(36.4, -12.4);
   }
-  for (const z of [22, 31, 40, 49]) {
-    addLamp(-5.2, z, "avenue");
-    addLamp(5.2, z, "avenue");
-  }
-  for (const z of [-22, -29]) {
-    addLamp(-5.1, z, "avenue");
-    addLamp(5.1, z, "avenue");
-  }
-  for (const x of [22, 31]) {
-    addLamp(x, 5.2, "avenue");
-    addLamp(x, -5.2, "avenue");
-    addLamp(-x, 5.2, "avenue");
-    addLamp(-x, -5.2, "avenue");
-  }
-  addLamp(-36.4, 12.4);
-  addLamp(-31.6, 12.4);
-  addLamp(31.6, -12.4);
-  addLamp(36.4, -12.4);
   const crossings = [[-40, 0], [-40, 70], [-40, -46], [27.2, 0], [-27.2, 0], [27.2, 25.1], [-27.2, 25.1], [27.2, -23.1], [-27.2, -23.1], [0, 0]];
   function curbClear(x, z) {
     if (Math.hypot(x, z) < 26) return false;
@@ -2187,7 +2200,8 @@ function addQuarry() {
   tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(8, 8);
   const span = (QUARRY.rim + 2) * 2;
-  const geo = new THREE.PlaneGeometry(span, span, 56, 56);
+  const segs = phone ? 14 : 56;
+  const geo = new THREE.PlaneGeometry(span, span, segs, segs);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
@@ -2205,7 +2219,7 @@ function addQuarry() {
 
   const rock = new THREE.MeshStandardMaterial({ color: 0x6d6258, roughness: 0.86 });
   const moss = new THREE.MeshStandardMaterial({ color: 0x3d6a3a, roughness: 0.8 });
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < (phone ? 4 : 12); i++) {
     const a = (i / 12) * Math.PI * 2 + 0.4;
     const x = QUARRY.x + Math.cos(a) * 17.2;
     const z = QUARRY.z + Math.sin(a) * 17.2;
@@ -2224,7 +2238,7 @@ function addQuarry() {
     addCircle(tx, tz, 0.4);
   }
   const iron = new THREE.MeshStandardMaterial({ color: 0x2a2e30, roughness: 0.42, metalness: 0.55 });
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < (phone ? 0 : 8); i++) {
     const a = (i / 8) * Math.PI * 2 + 0.2;
     const x = QUARRY.x + Math.cos(a) * 12.4;
     const z = QUARRY.z + Math.sin(a) * 12.4;
@@ -5391,13 +5405,14 @@ function setupWardrobe(hero) {
 
 async function boot() {
   setLoad(t("boot"));
-  const [heroGltf, idleGltf, walkGltf, jogGltf, parrot] = await Promise.all([
+  const basePack = await Promise.all([
     loadGltf("/models/hero.glb"),
     loadGltf("/models/idle.glb"),
     loadGltf("/models/walk.glb"),
     loadGltf("/models/jog.glb"),
-    loadGltf(MODELS.parrot),
   ]);
+  const [heroGltf, idleGltf, walkGltf, jogGltf] = basePack;
+  const parrot = phone ? null : await loadGltf(MODELS.parrot);
 
   pinHipsXZ(idleGltf.animations);
   pinHipsXZ(walkGltf.animations);
@@ -5429,13 +5444,16 @@ async function boot() {
   mixers.push(player.mixer);
   city.bind(hero, idleGltf.animations[0]);
 
-  for (let i = 0; i < 10; i++) {
+  const crowdN = phone ? 2 : 10;
+  for (let i = 0; i < crowdN; i++) {
     const body = cloneSkeleton(heroGltf.scene);
     ownMaterials(body);
     spawnCitizen(body, i, [idleGltf.animations[0], walkGltf.animations[0]]);
   }
-  for (let i = 0; i < 5; i++) spawnBird(parrot, i);
-  spawnKindBirds();
+  if (!phone && parrot) {
+    for (let i = 0; i < 5; i++) spawnBird(parrot, i);
+    spawnKindBirds();
+  }
 
   document.getElementById("boot").classList.add("hidden");
 }
@@ -7375,39 +7393,55 @@ function saveWhere() {
   }
 }
 
+let phoneTick = 0;
+let phoneHeavy = 0;
+
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.04);
   const now = clock.elapsedTime;
-  for (const flame of hearthFlames) {
-    const i = flame.userData.i;
-    flame.scale.y = 0.72 + Math.sin(now * 11 + i * 2.1) * 0.32;
-    flame.scale.x = 0.8 + Math.sin(now * 8 + i) * 0.18;
-    flame.material.opacity = 0.58 + Math.sin(now * 14 + i) * 0.22;
+  phoneTick += 1;
+  const phoneLiteFrame = phone && phoneTick % 2 === 1;
+
+  if (!phone) {
+    for (const flame of hearthFlames) {
+      const i = flame.userData.i;
+      flame.scale.y = 0.72 + Math.sin(now * 11 + i * 2.1) * 0.32;
+      flame.scale.x = 0.8 + Math.sin(now * 8 + i) * 0.18;
+      flame.material.opacity = 0.58 + Math.sin(now * 14 + i) * 0.22;
+    }
   }
   updateVitals(dt);
   persistVitals(dt);
   updatePlayer(dt);
-  noteBoard();
+  if (!phoneLiteFrame) noteBoard();
   updateCrowd(dt, now);
-  updateBirds(dt);
-  updatePlazaDoors(dt);
-  updateBlooms();
-  updateCritters(dt);
+  if (!phone) {
+    updateBirds(dt);
+    updateBlooms();
+    updateCritters(dt);
+    updateFountain(dt);
+  }
+  phoneHeavy += dt;
+  if (!phone || phoneHeavy > 0.12) {
+    if (phone) phoneHeavy = 0;
+    updatePlazaDoors(dt);
+  }
   syncCombatUi();
-  updateFountain(dt);
   for (const m of mixers) {
     if (m._zvSkip) continue;
     m.update(dt);
   }
-  poseCrowd();
-  if (avatar.look) applyEyes(avatar.look);
-  applyFrameBody();
+  if (!phoneLiteFrame) poseCrowd();
+  if (avatar.look && !phoneLiteFrame) applyEyes(avatar.look);
+  if (!phoneLiteFrame) applyFrameBody();
   camera.getWorldDirection(shotDir);
   city.bendAim(shotDir, dt);
   placeReticle();
   updateShots(dt);
-  city.update(dt, now);
-  world.update(dt, now);
+  if (!phoneLiteFrame) {
+    city.update(dt * (phone ? 2 : 1), now);
+    world.update(dt * (phone ? 2 : 1), now);
+  }
   updateDrops(now);
   updateCamera();
   renderer.render(scene, camera);
@@ -7717,7 +7751,7 @@ const world = createWorld({
   fillLight: lights.fill,
   streetLights,
   lampGlow,
-  lampLimit: phone ? 1 : 8,
+  lampLimit: phone ? 0 : 8,
   plainSky: phone,
   addCircle,
   lakes: LAKES,
@@ -7738,6 +7772,7 @@ const city = createCity({
   npcs,
   groundAt,
   addBlock,
+  lite: phone,
   benches: benchSpots.concat(world.benches),
   getZcoin: () => zcoin,
   setZcoin: (n) => {
