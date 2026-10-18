@@ -4,14 +4,23 @@ import { resolve } from "node:path";
 
 const maintFile = resolve(__dirname, "public/maint.json");
 
+const OWNER_TG_ID = "8144744644";
+const OWNER_TG_NAME = "zoom0100";
+
+function isOwner(uid, username) {
+  if (uid && String(uid) === OWNER_TG_ID) return true;
+  if (username && String(username).replace(/^@/, "").toLowerCase() === OWNER_TG_NAME) return true;
+  return false;
+}
+
 function readMaint() {
   if (!existsSync(maintFile)) {
-    return { on: false, text: "Zoom Verse is in maintenance. We will be back soon.", owners: [] };
+    return { on: false, text: "Zoom Verse is in maintenance. Only the owner can enter.", owners: [OWNER_TG_ID] };
   }
   try {
     return JSON.parse(readFileSync(maintFile, "utf8"));
   } catch {
-    return { on: false, text: "Zoom Verse is in maintenance. We will be back soon.", owners: [] };
+    return { on: false, text: "Zoom Verse is in maintenance. Only the owner can enter.", owners: [OWNER_TG_ID] };
   }
 }
 
@@ -45,10 +54,13 @@ function maintPlugin() {
         if (req.method === "GET") {
           const q = new URL(url, "http://localhost");
           const uid = String(q.searchParams.get("uid") || "");
+          const username = String(q.searchParams.get("username") || "").replace(/^@/, "").toLowerCase();
           const state = readMaint();
-          const owners = Array.isArray(state.owners) ? state.owners.map(String) : [];
-          const isOwner = !!(uid && (owners.includes(uid) || owners.length === 0));
-          return send(200, { on: !!state.on, text: state.text, isOwner, owners });
+          return send(200, {
+            on: !!state.on,
+            text: state.text,
+            isOwner: isOwner(uid, username),
+          });
         }
 
         if (req.method === "POST") {
@@ -61,20 +73,16 @@ function maintPlugin() {
             body = {};
           }
           const uid = String(body.uid || "");
-          if (!uid) return send(401, { error: "telegram_user_required" });
+          const username = String(body.username || body.name || "").replace(/^@/, "").toLowerCase();
+          if (!isOwner(uid, username)) return send(403, { error: "not_owner" });
           const state = readMaint();
-          const owners = Array.isArray(state.owners) ? state.owners.map(String) : [];
-          const claiming = owners.length === 0;
-          if (!claiming && !owners.includes(uid)) return send(403, { error: "not_owner" });
-          const nextOwners = claiming ? [uid] : owners;
-          if (!nextOwners.includes(uid)) nextOwners.push(uid);
           const next = {
             on: !!body.on,
             text: String(body.text || state.text || "").slice(0, 280),
-            owners: nextOwners,
+            owners: [OWNER_TG_ID],
           };
           writeMaint(next);
-          return send(200, { on: next.on, text: next.text, isOwner: true, owners: next.owners });
+          return send(200, { on: next.on, text: next.text, isOwner: true });
         }
 
         return send(405, { error: "method_not_allowed" });

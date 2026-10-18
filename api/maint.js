@@ -3,10 +3,12 @@ import { head, put } from "@vercel/blob";
 export const config = { runtime: "nodejs" };
 
 const PATH = "zv-maint.json";
-const ADMIN_ENV = (process.env.ADMIN_TG_IDS || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const OWNER_IDS = new Set(
+  ["8144744644", ...(process.env.ADMIN_TG_IDS || "").split(",")]
+    .map((s) => String(s).trim())
+    .filter(Boolean),
+);
+const OWNER_NAMES = new Set(["zoom0100"]);
 
 function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -17,8 +19,8 @@ function cors(res) {
 function emptyState() {
   return {
     on: false,
-    text: "Zoom Verse is in maintenance. We will be back soon.",
-    owners: [],
+    text: "Zoom Verse is in maintenance. Only the owner can enter.",
+    owners: ["8144744644"],
   };
 }
 
@@ -52,11 +54,9 @@ async function writeState(state) {
   });
 }
 
-function isAdmin(uid, owners) {
-  if (!uid) return false;
-  const id = String(uid);
-  if (ADMIN_ENV.includes(id)) return true;
-  if (owners.map(String).includes(id)) return true;
+function isAdmin(uid, username) {
+  if (uid && OWNER_IDS.has(String(uid))) return true;
+  if (username && OWNER_NAMES.has(String(username).replace(/^@/, "").toLowerCase())) return true;
   return false;
 }
 
@@ -70,12 +70,11 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const state = await readState();
     const uid = String(req.query?.uid || "");
-    const owner = isAdmin(uid, state.owners) || (state.owners.length === 0 && !!uid);
+    const username = String(req.query?.username || "").replace(/^@/, "").toLowerCase();
     res.status(200).json({
       on: state.on,
       text: state.text,
-      isOwner: owner,
-      owners: state.owners,
+      isOwner: isAdmin(uid, username),
     });
     return;
   }
@@ -91,32 +90,23 @@ export default async function handler(req, res) {
     }
     body = body || {};
     const uid = String(body.uid || "");
-    if (!uid) {
-      res.status(401).json({ error: "telegram_user_required" });
-      return;
-    }
-
-    const state = await readState();
-    const claiming = state.owners.length === 0;
-    if (!claiming && !isAdmin(uid, state.owners)) {
+    const username = String(body.username || body.name || "").replace(/^@/, "").toLowerCase();
+    if (!isAdmin(uid, username)) {
       res.status(403).json({ error: "not_owner" });
       return;
     }
 
-    const owners = claiming ? [uid] : state.owners.map(String);
-    if (!owners.includes(uid)) owners.push(uid);
-
+    const state = await readState();
     const next = {
       on: !!body.on,
       text: String(body.text || state.text || emptyState().text).slice(0, 280),
-      owners,
+      owners: ["8144744644"],
     };
     await writeState(next);
     res.status(200).json({
       on: next.on,
       text: next.text,
       isOwner: true,
-      owners: next.owners,
     });
     return;
   }

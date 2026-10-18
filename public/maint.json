@@ -1,5 +1,5 @@
 {
   "on": false,
-  "text": "Zoom Verse is in maintenance. We will be back soon.",
-  "owners": []
+  "text": "Zoom Verse is in maintenance. Only the owner can enter.",
+  "owners": ["8144744644"]
 }

@@ -6802,10 +6802,11 @@ function tryPickup() {
 
 const MAINT_KEY = "zv-maintenance";
 const BAN_KEY = "zv-bans";
+const OWNER_TG_ID = "8144744644";
+const OWNER_TG_NAME = "zoom0100";
 const maintenance = JSON.parse(localStorage.getItem(MAINT_KEY) || "null") || {
   on: false,
   text: t("maintDefault"),
-  owners: [],
 };
 let maintOwner = false;
 let gameLocked = false;
@@ -6816,17 +6817,27 @@ function tgUid() {
   return u?.id != null ? String(u.id) : "";
 }
 
+function tgUsername() {
+  const u = window.Telegram?.WebApp?.initDataUnsafe?.user;
+  return u?.username ? String(u.username).replace(/^@/, "").toLowerCase() : "";
+}
+
 function tgUserLabel() {
   const u = window.Telegram?.WebApp?.initDataUnsafe?.user;
   if (!u) return "";
   return u.username ? `@${u.username}` : [u.first_name, u.last_name].filter(Boolean).join(" ") || String(u.id);
 }
 
+function computeIsOwner() {
+  const uid = tgUid();
+  const name = tgUsername();
+  if (uid && uid === OWNER_TG_ID) return true;
+  if (name && name === OWNER_TG_NAME) return true;
+  return false;
+}
+
 function persistMaintLocal() {
-  localStorage.setItem(
-    MAINT_KEY,
-    JSON.stringify({ on: maintenance.on, text: maintenance.text, owners: maintenance.owners || [] }),
-  );
+  localStorage.setItem(MAINT_KEY, JSON.stringify({ on: maintenance.on, text: maintenance.text }));
 }
 
 function setAdminVisible(on) {
@@ -6857,34 +6868,35 @@ function applyMaintenance() {
 }
 
 async function fetchMaintenance() {
+  maintOwner = computeIsOwner();
   const uid = tgUid();
+  const username = tgUsername();
   try {
-    const res = await fetch(`/api/maint?uid=${encodeURIComponent(uid)}&t=${Date.now()}`, { cache: "no-store" });
+    const q = new URLSearchParams({ uid, username, t: String(Date.now()) });
+    const res = await fetch(`/api/maint?${q}`, { cache: "no-store" });
     if (!res.ok) throw new Error("maint_http");
     const data = await res.json();
     maintenance.on = !!data.on;
     maintenance.text = data.text || t("maintDefault");
-    maintenance.owners = Array.isArray(data.owners) ? data.owners.map(String) : [];
-    maintOwner = !!data.isOwner;
+    maintOwner = computeIsOwner();
     persistMaintLocal();
     applyMaintenance();
     return true;
   } catch {
-    const uidNow = tgUid();
-    const owners = Array.isArray(maintenance.owners) ? maintenance.owners.map(String) : [];
-    maintOwner = !!(uidNow && owners.includes(uidNow));
+    maintOwner = computeIsOwner();
     applyMaintenance();
     return false;
   }
 }
 
 async function pushMaintenance() {
-  const uid = tgUid();
-  if (!uid) {
-    persistMaintLocal();
+  maintOwner = computeIsOwner();
+  if (!maintOwner) {
     applyMaintenance();
     return false;
   }
+  const uid = tgUid();
+  const username = tgUsername();
   try {
     const res = await fetch("/api/maint", {
       method: "POST",
@@ -6893,6 +6905,7 @@ async function pushMaintenance() {
         on: maintenance.on,
         text: maintenance.text,
         uid,
+        username,
         name: tgUserLabel(),
       }),
     });
@@ -6900,7 +6913,6 @@ async function pushMaintenance() {
     const data = await res.json();
     maintenance.on = !!data.on;
     maintenance.text = data.text || maintenance.text;
-    maintenance.owners = Array.isArray(data.owners) ? data.owners.map(String) : maintenance.owners;
     maintOwner = true;
     persistMaintLocal();
     applyMaintenance();
