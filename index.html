@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Zoom Verse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="boot">
+      <div class="boot-card">
+        <h1>Zoom Verse</h1>
+        <p id="load">Opening Zoom Verse…</p>
+      </div>
+    </div>
+    <div id="senses"></div>
+    <div id="vitals">
+      <div class="vital">
+        <span data-i18n="life">Life</span>
+        <b><i id="vital-life"></i></b>
+      </div>
+      <div class="vital">
+        <span data-i18n="hunger">Hunger</span>
+        <b><i id="vital-hunger"></i></b>
+      </div>
+      <div class="vital">
+        <span data-i18n="thirst">Thirst</span>
+        <b><i id="vital-thirst"></i></b>
+      </div>
+      <div id="zc-chip">
+        <span class="bills" aria-hidden="true"><i></i><i></i><i></i></span>
+        <strong id="zc-amount">0</strong>
+      </div>
+    </div>
+    <div id="stink"></div>
+    <div id="flash"></div>
+    <canvas id="minimap" width="208" height="208"></canvas>
+    <div id="stick" hidden><i id="stick-knob"></i></div>
+    <div id="chat-stack" class="hidden"></div>
+    <div id="npc-bubble" class="hidden"></div>
+    <div id="toast" class="hidden"></div>
+    <div id="place-banner" class="hidden"></div>
+    <button id="act-btn" class="hidden" type="button"></button>
+    <button id="decor-btn" class="hidden" type="button" data-i18n="decorBtn">Furnish</button>
+    <aside id="decor" class="pop hidden"></aside>
+    <button id="pose-stop" class="hidden" type="button"></button>
+    <button id="acts-open" type="button">Actions</button>
+    <div id="acts" class="pop hidden"></div>
+    <div id="civic" class="pop hidden"></div>
+    <div id="bank" class="pop hidden"></div>
+    <div id="shop" class="pop hidden"></div>
+    <div id="import" class="pop hidden"></div>
+    <div id="zcmarket" class="pop hidden"></div>
+    <div id="pesca" class="pop hidden"></div>
+    <form id="chat-form">
+      <input id="chat-input" maxlength="80" autocomplete="off" enterkeyhint="send" placeholder="Write in the world" />
+      <button type="submit">OK</button>
+    </form>
+    <div id="zone-tag" class="safe"></div>
+    <div id="reticle" class="hidden"></div>
+    <button id="aim-btn" class="hidden" type="button" data-i18n="aim">Aim</button>
+    <button id="fire-btn" class="hidden" type="button" data-i18n="fire">Fire</button>
+    <button id="reload-btn" class="hidden" type="button" data-i18n="reload">Reload</button>
+    <button id="hop-btn" class="hidden" type="button" data-i18n="hop">Jump</button>
+    <button id="run-btn" type="button" data-i18n="run">Run</button>
+    <button id="key-btn" class="hidden" type="button">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="18" cy="32" r="10" fill="none" stroke="#b8862f" stroke-width="6" />
+        <path d="M26 32h26M44 32v8M38 32v6" fill="none" stroke="#b8862f" stroke-width="6" stroke-linecap="round" />
+      </svg>
+      <span data-i18n="keyOpen">Open</span>
+    </button>
+    <button id="phone-toggle" class="hidden" type="button">Phone</button>
+    <div id="phone" class="hidden">
+      <div id="phone-dim"></div>
+      <div id="handset">
+        <div id="screen">
+          <header id="phone-status"><span id="phone-clock">12:00</span></header>
+          <div id="phone-body"></div>
+        </div>
+        <button id="phone-back" type="button" aria-label="Back"></button>
+      </div>
+    </div>
+    <button id="menu-btn" type="button" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div id="menu" class="pop hidden">
+      <button type="button" data-open="wardrobe" data-i18n="mirror">Mirror</button>
+      <button type="button" data-open="bag" data-i18n="bag">Bag</button>
+      <button type="button" data-open="market" data-i18n="market">Market</button>
+      <button type="button" data-open="tasks" data-i18n="tasks">Tasks</button>
+      <button type="button" data-open="settings" data-i18n="settings">Settings</button>
+      <button type="button" data-open="admin" data-i18n="admin">Admin</button>
+    </div>
+    <aside id="help" class="pop hidden">
+      <h2 data-i18n="help">Help</h2>
+      <p data-i18n="help1"></p>
+      <p data-i18n="help2"></p>
+      <p data-i18n="help3"></p>
+      <p data-i18n="help4"></p>
+      <button type="button" data-close="help" data-i18n="close">Close</button>
+    </aside>
+    <aside id="tasks" class="pop hidden">
+      <h2 data-i18n="tasks">Tasks</h2>
+      <p id="level-line"></p>
+      <div id="task-list"></div>
+      <button type="button" data-close="tasks" data-i18n="close">Close</button>
+    </aside>
+    <aside id="settings" class="sheet hidden">
+      <p class="sheet-mark">Zoom Verse</p>
+      <header>
+        <h2 data-i18n="settings">Settings</h2>
+        <button type="button" data-close="settings" data-i18n="close">Close</button>
+      </header>
+      <p class="sheet-label" data-i18n="language">Language</p>
+      <div id="lang-list"></div>
+    </aside>
+    <aside id="atelier" class="pop hidden"></aside>
+    <aside id="market" class="pop hidden">
+      <h2 data-i18n="market">Market</h2>
+      <p data-i18n="marketHint"></p>
+      <p id="zcoin-line"></p>
+      <code id="house-wallet"></code>
+      <button id="buy-zcoin" type="button" data-i18n="buyZcoin">Buy 100 ZCOIN · 1 GRAM</button>
+      <button id="buy-bread" type="button" data-i18n="buyBread">Bread · 8 ZCOIN</button>
+      <button id="buy-water" type="button" data-i18n="buyWater">Water · 5 ZCOIN</button>
+      <p id="pay-status"></p>
+      <button type="button" data-close="market" data-i18n="close">Close</button>
+    </aside>
+    <button id="pickup-btn" class="hidden" type="button">Pick up</button>
+    <div id="maint-note" class="hidden"></div>
+    <div id="maintenance" class="hidden">
+      <div class="panel">
+        <h1>Zoom Verse</h1>
+        <p id="maintenance-text">Zoom Verse is in maintenance. We will be back soon.</p>
+      </div>
+    </div>
+    <aside id="admin" class="pop hidden">
+      <h2 data-i18n="adminTitle">Admin</h2>
+      <p class="mirror-hint" data-i18n="adminHint"></p>
+      <label class="admin-line"><input id="maint-toggle" type="checkbox" /> <span data-i18n="maint">Maintenance</span></label>
+      <textarea id="maint-text" rows="3"></textarea>
+      <button id="maint-save" type="button" data-i18n="maintSave">Save text</button>
+      <button id="admin-plaza" type="button" data-i18n="toPlaza">Take me to the plaza</button>
+      <label class="admin-line"><span data-i18n="sex">Sex</span>
+        <select id="admin-sex">
+          <option value="f" data-i18n="female">Female</option>
+          <option value="m" data-i18n="male">Male</option>
+        </select>
+      </label>
+      <p class="mirror-hint" data-i18n="sexHint"></p>
+      <label class="admin-line"><span data-i18n="tgName">Telegram name</span><input id="admin-tg" type="text" maxlength="32" data-i18n-placeholder="tgPh" placeholder="empty = you" /></label>
+      <label class="admin-line"><span data-i18n="coinAmount">Amount</span><input id="admin-coin" type="number" min="1" step="1" value="100" /></label>
+      <div class="admin-row">
+        <button id="admin-coin-add" type="button" data-i18n="coinAdd">Add ZCOIN</button>
+        <button id="admin-coin-sub" type="button" data-i18n="coinRemove">Remove ZCOIN</button>
+      </div>
+      <p id="admin-coin-status"></p>
+      <div class="admin-row">
+        <button id="admin-bread" type="button" data-i18n="sendBread">Send bread</button>
+        <button id="admin-water" type="button" data-i18n="sendWater">Send water</button>
+      </div>
+      <p id="admin-gift"></p>
+      <label class="admin-line"><span data-i18n="playerName">Player name</span><input id="admin-name" type="text" maxlength="24" data-i18n-placeholder="playerPh" placeholder="name" /></label>
+      <div class="admin-row">
+        <button id="admin-ban" type="button" data-i18n="ban">Mark ban</button>
+        <button id="admin-move" type="button" data-i18n="move">Mark move</button>
+      </div>
+      <ul id="admin-log"></ul>
+      <button id="admin-close" type="button" data-i18n="close">Close</button>
+    </aside>
+    <aside id="bag" class="pop hidden">
+      <div>
+        <h2 data-i18n="bag">Bag</h2>
+        <div id="bag-grid"></div>
+      </div>
+      <div id="bag-detail">
+        <h3 id="bag-title" data-i18n="choose">Choose an item</h3>
+        <p id="bag-help" data-i18n="bagHelp"></p>
+        <label><span data-i18n="qty">Amount</span> <input id="bag-qty" type="number" min="1" value="1" /></label>
+        <button id="bag-drop" type="button" data-i18n="drop">Drop</button>
+      </div>
+      <button id="bag-close" type="button" data-close="bag" data-i18n="close">Close</button>
+    </aside>
+    <aside id="wardrobe" class="hidden">
+      <h2 data-i18n="wardrobeTitle">Mirror</h2>
+      <div id="wardrobe-body"></div>
+      <button id="wardrobe-close" type="button" data-i18n="wardrobeClose">Close and live</button>
+    </aside>
+    <div id="hotbar-wrap">
+      <div id="tool-hint" class="hidden"></div>
+      <div id="hotbar"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
