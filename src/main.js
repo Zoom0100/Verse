@@ -30,10 +30,20 @@ const WATER_PRICE = 5;
 
 initLanguage();
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
+const tgBoot = window.Telegram?.WebApp;
+const phone =
+  (tgBoot && ["ios", "android", "android_x"].includes(tgBoot.platform)) ||
+  /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+  (window.matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 1000);
+function fitRatio() {
+  if (!phone) return Math.min(window.devicePixelRatio, 1.5);
+  const long = Math.max(window.innerWidth, window.innerHeight, 1);
+  return Math.min(1, 512 / long);
+}
+const renderer = new THREE.WebGLRenderer({ antialias: !phone, powerPreference: "high-performance" });
+renderer.setPixelRatio(fitRatio());
+renderer.setSize(window.innerWidth, window.innerHeight, false);
+renderer.shadowMap.enabled = !phone;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
@@ -43,11 +53,14 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9ec9ef);
 scene.fog = new THREE.FogExp2(0xc5d7ea, 0.0024);
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-pmrem.dispose();
+if (!phone) {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  pmrem.dispose();
+}
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 400);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, phone ? 200 : 400);
+if (phone) document.body.classList.add("phone");
 const clock = new THREE.Clock();
 const loader = new GLTFLoader();
 
@@ -295,7 +308,7 @@ function addLights(sunDir) {
 
   const sun = new THREE.DirectionalLight(0xfff1d6, 2.15);
   sun.position.copy(sunDir).multiplyScalar(60);
-  sun.castShadow = true;
+  sun.castShadow = !phone;
   sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 120;
@@ -1924,7 +1937,7 @@ function addHome() {
   const day = new THREE.SpotLight(0xfff4e5, 6, 14, 0.9, 0.6, 1);
   day.position.set(cx, 3.05, northZ - 0.4);
   day.target.position.set(cx, 0.6, cz);
-  day.castShadow = true;
+  day.castShadow = !phone;
   day.shadow.mapSize.set(1024, 1024);
   day.shadow.bias = -0.0004;
   group.add(day);
@@ -2852,6 +2865,7 @@ function spawnCitizen(root, i, clips) {
     actions,
     bones,
     phone,
+    mixer,
     hunch: 0,
     speed: role.speed,
     route,
@@ -5954,6 +5968,7 @@ function bendNpc(bone, x, y, z) {
 
 function poseCrowd() {
   for (const n of npcs) {
+    if (n.mixer?._zvSkip) continue;
     if (n.phone) n.phone.visible = n.mode === "phone";
     if (n.hunch) bendNpc(n.bones?.Spine, n.hunch, 0, 0);
     if (n.mode === "phone") {
@@ -5971,7 +5986,28 @@ function poseCrowd() {
 }
 
 function updateCrowd(dt, time) {
+  const px = player.group.position.x;
+  const pz = player.group.position.z;
+  let phoneNear = null;
+  if (phone) {
+    phoneNear = new Set();
+    const ranked = npcs.map((n) => {
+      const dx = (n.pivot?.position.x || 0) - px;
+      const dz = (n.pivot?.position.z || 0) - pz;
+      return { n, d: dx * dx + dz * dz };
+    });
+    ranked.sort((a, b) => a.d - b.d);
+    for (let i = 0; i < ranked.length && phoneNear.size < 3; i++) {
+      if (ranked[i].d < 18 * 18) phoneNear.add(ranked[i].n);
+    }
+  }
   for (const n of npcs) {
+    if (phone && n.pivot) {
+      const far = !phoneNear.has(n);
+      n.pivot.visible = !far;
+      if (n.mixer) n.mixer._zvSkip = far;
+      if (far) continue;
+    }
     if (n.down) {
       n.downT -= dt;
       n.pivot.rotation.x = Math.PI / 2;
@@ -7359,7 +7395,10 @@ function tick() {
   updateCritters(dt);
   syncCombatUi();
   updateFountain(dt);
-  for (const m of mixers) m.update(dt);
+  for (const m of mixers) {
+    if (m._zvSkip) continue;
+    m.update(dt);
+  }
   poseCrowd();
   if (avatar.look) applyEyes(avatar.look);
   applyFrameBody();
@@ -7557,16 +7596,69 @@ window.addEventListener(
   { passive: true },
 );
 
+function gameHeight() {
+  const tg = window.Telegram?.WebApp;
+  if (tg?.viewportStableHeight > 0) return tg.viewportStableHeight;
+  return window.innerHeight;
+}
+
+function placeChat() {
+  const form = document.getElementById("chat-form");
+  if (!form) return;
+  const tg = window.Telegram?.WebApp;
+  let covered = 0;
+  if (tg?.viewportStableHeight && tg.viewportHeight) covered = Math.max(0, tg.viewportStableHeight - tg.viewportHeight);
+  else if (window.visualViewport) covered = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+  form.style.bottom = covered > 8 ? `${12 + covered}px` : "";
+}
+
+function holdTelegram() {
+  const tg = window.Telegram?.WebApp;
+  if (!tg) return;
+  tg.ready();
+  tg.expand();
+  try {
+    tg.disableVerticalSwipes();
+  } catch {
+    /* older Telegram */
+  }
+  if (!tg.isFullscreen) {
+    try {
+      tg.requestFullscreen();
+    } catch {
+      /* fullscreen needs a newer Telegram */
+    }
+  }
+}
+
 function resizeView() {
-  const panel = wardrobeOpen ? Math.min(400, Math.round(window.innerWidth * 0.34)) : 0;
-  const width = Math.max(320, window.innerWidth - panel);
-  const height = window.innerHeight;
+  const panel = !phone && wardrobeOpen ? Math.min(400, Math.round(window.innerWidth * 0.34)) : 0;
+  const width = Math.max(1, window.innerWidth - panel);
+  const height = Math.max(1, gameHeight());
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setSize(width, height);
+  renderer.setPixelRatio(fitRatio());
+  renderer.setSize(width, height, false);
+  placeChat();
 }
 
 window.addEventListener("resize", resizeView);
+window.visualViewport?.addEventListener("resize", placeChat);
+holdTelegram();
+window.Telegram?.WebApp?.onEvent?.("viewportChanged", () => {
+  holdTelegram();
+  resizeView();
+});
+document.addEventListener(
+  "touchmove",
+  (e) => {
+    if (e.target instanceof Element && e.target.closest("input, textarea, select, .panel, .pop, .sheet, #wardrobe, #bag, #handset, #phone-body")) return;
+    e.preventDefault();
+  },
+  { passive: false },
+);
+document.addEventListener("pointerdown", holdTelegram);
+resizeView();
 
 let pinchDist = 0;
 let decorTouch = null;
@@ -7625,6 +7717,8 @@ const world = createWorld({
   fillLight: lights.fill,
   streetLights,
   lampGlow,
+  lampLimit: phone ? 1 : 8,
+  plainSky: phone,
   addCircle,
   lakes: LAKES,
   swayTrees,

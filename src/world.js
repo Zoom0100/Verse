@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 const WORLD_R = 206;
 
-export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight, fillLight, streetLights = [], lampGlow = null, addCircle, lakes, swayTrees, rippleMaterial, quarry, importAt, marketAt, pescaAt, atelierAt }) {
+export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight, fillLight, streetLights = [], lampGlow = null, lampLimit = 8, plainSky = false, addCircle, lakes, swayTrees, rippleMaterial, quarry, importAt, marketAt, pescaAt, atelierAt }) {
   const benches = [];
   const skyU = sky.material.uniforms;
   const fogColor = new THREE.Color();
@@ -98,6 +98,9 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
     scene.add(sprite);
     clouds.push(sprite);
   }
+  if (plainSky) {
+    for (const cloud of clouds) cloud.visible = false;
+  }
 
   const rainCount = 650;
   const rainPos = new Float32Array(rainCount * 3);
@@ -109,6 +112,8 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
     new THREE.PointsMaterial({ color: 0xd7e6f4, size: 0.07, transparent: true, opacity: 0.45, depthWrite: false }),
   );
   scene.add(rain);
+  const rainDraw = plainSky ? 140 : rainCount;
+  rain.geometry.setDrawRange(0, rainDraw);
 
   if (sky) {
     sky.renderOrder = -1;
@@ -730,39 +735,37 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
     }
   }
 
-  function drawMap() {
-    const size = mapBig ? 520 : 236;
-    if (mapEl.width !== size) {
-      mapEl.width = size;
-      mapEl.height = size;
-    }
-    const g = mapCtx;
-    const R = mapBig ? 190 : 40;
-    const s = size / (R * 2);
-    const originX = mapBig ? 0 : player.group.position.x;
-    const originZ = mapBig ? 0 : player.group.position.z;
-    const X = (x) => size / 2 + (x - originX) * s;
-    const Y = (z) => size / 2 + (z - originZ) * s;
-    g.clearRect(0, 0, size, size);
-    g.save();
-    if (!mapBig) {
-      g.beginPath();
-      g.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
-      g.clip();
-    }
-    const grass = g.createRadialGradient(size * 0.38, size * 0.32, size * 0.04, size / 2, size / 2, size * 0.7);
-    grass.addColorStop(0, "#efe2b4");
-    grass.addColorStop(0.4, "#b7d48a");
-    grass.addColorStop(0.78, "#6f9a52");
-    grass.addColorStop(1, "#3e6238");
-    g.fillStyle = grass;
+  let baseMap = null;
+  const MAP_SPAN = 420;
+
+  function paintCity(g, size) {
+    const s = size / MAP_SPAN;
+    const X = (x) => size / 2 + x * s;
+    const Y = (z) => size / 2 + z * s;
+    const ground = g.createRadialGradient(size * 0.48, size * 0.42, size * 0.04, size / 2, size / 2, size * 0.68);
+    ground.addColorStop(0, "#1e6b44");
+    ground.addColorStop(0.42, "#124e32");
+    ground.addColorStop(0.74, "#0c3424");
+    ground.addColorStop(1, "#06140e");
+    g.fillStyle = ground;
     g.fillRect(0, 0, size, size);
-    g.fillStyle = "rgba(90, 130, 62, 0.22)";
+    g.fillStyle = "#0d2e22";
+    for (const [x, z, w, d] of [
+      [-124, -40, 76, 32],
+      [-124, 8, 76, 54],
+      [-32, 14, 28, 48],
+      [16, 14, 100, 50],
+      [16, -40, 100, 32],
+      [-124, -94, 108, 42],
+      [16, -94, 100, 42],
+      [-150, 78, 110, 24],
+      [36, 78, 80, 22],
+    ]) g.fillRect(X(x), Y(z), w * s, d * s);
+    g.fillStyle = "rgba(46, 140, 86, 0.45)";
     g.beginPath();
     g.arc(X(-58), Y(46), 16 * s, 0, Math.PI * 2);
     g.arc(X(62), Y(-50), 14 * s, 0, Math.PI * 2);
     g.fill();
-
     const ribbon = (x1, z1, x2, z2, width, fill) => {
       const dx = x2 - x1;
       const dz = z2 - z1;
@@ -779,23 +782,21 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
       g.fill();
     };
     const avenue = (x1, z1, x2, z2) => {
-      ribbon(x1, z1, x2, z2, 6.4, "#d9d0c2");
-      ribbon(x1, z1, x2, z2, 4.2, "#4a5258");
-      ribbon(x1, z1, x2, z2, 0.35, "#e2d48a");
+      ribbon(x1, z1, x2, z2, 8.4, "#e6e8ea");
+      ribbon(x1, z1, x2, z2, 6.1, "#5e666e");
+      ribbon(x1, z1, x2, z2, 0.42, "rgba(240, 214, 120, 0.95)");
     };
-    g.strokeStyle = "#c8c2b4";
-    g.lineWidth = 6.4 * s;
+    g.strokeStyle = "#e6e8ea";
+    g.lineWidth = 8.4 * s;
     g.beginPath();
     g.arc(X(0), Y(0), 21.5 * s, 0, Math.PI * 2);
     g.stroke();
-    g.strokeStyle = "#efe8da";
-    g.lineWidth = 4.4 * s;
-    g.beginPath();
-    g.arc(X(0), Y(0), 21.5 * s, 0, Math.PI * 2);
+    g.strokeStyle = "#5e666e";
+    g.lineWidth = 5.4 * s;
     g.stroke();
-    g.fillStyle = "#e7efe0";
+    g.fillStyle = "#187248";
     g.beginPath();
-    g.arc(X(0), Y(0), 15.2 * s, 0, Math.PI * 2);
+    g.arc(X(0), Y(0), 15 * s, 0, Math.PI * 2);
     g.fill();
     avenue(0, 16, 0, 62);
     avenue(0, -16, 0, -36);
@@ -813,100 +814,196 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
     avenue(-128, -100, -128, 108);
     avenue(-148, -100, 148, -100);
     avenue(-148, 108, -30, 108);
-    g.fillStyle = "#e7e1d4";
-    g.beginPath();
-    g.arc(X(108), Y(38), 11 * s, 0, Math.PI * 2);
-    g.arc(X(-108), Y(-36), 11 * s, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = "#9aa4b0";
-    g.beginPath();
+    for (const [cx, cz] of [[108, 38], [-108, -36]]) {
+      g.fillStyle = "#e6e8ea";
+      g.beginPath();
+      g.arc(X(cx), Y(cz), 12 * s, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#5e666e";
+      g.beginPath();
+      g.arc(X(cx), Y(cz), 8 * s, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "#187248";
+      g.beginPath();
+      g.arc(X(cx), Y(cz), 3.6 * s, 0, Math.PI * 2);
+      g.fill();
+    }
     ribbon(18, 74.3, 18, 110, 3.4, "#8d6844");
+    g.fillStyle = "#6a5344";
     g.beginPath();
     g.arc(X(18), Y(116), 9 * s, 0, Math.PI * 2);
     g.fill();
-
     for (const lake of lakes) {
-      g.fillStyle = "#d9c7a2";
+      g.fillStyle = "#c2ad88";
       g.beginPath();
-      g.arc(X(lake.x), Y(lake.z), (lake.r + 1.1) * s, 0, Math.PI * 2);
+      g.arc(X(lake.x), Y(lake.z), (lake.r + 1.4) * s, 0, Math.PI * 2);
       g.fill();
-      const water = g.createRadialGradient(X(lake.x), Y(lake.z), lake.r * s * 0.15, X(lake.x), Y(lake.z), lake.r * s);
-      water.addColorStop(0, "#8fd4ee");
-      water.addColorStop(0.55, "#3f93c4");
-      water.addColorStop(1, "#1d6f9a");
+      const water = g.createRadialGradient(X(lake.x), Y(lake.z), lake.r * s * 0.1, X(lake.x), Y(lake.z), lake.r * s);
+      water.addColorStop(0, "#7ec8ee");
+      water.addColorStop(0.55, "#1f78b4");
+      water.addColorStop(1, "#0d4e78");
       g.fillStyle = water;
       g.beginPath();
       g.arc(X(lake.x), Y(lake.z), lake.r * s, 0, Math.PI * 2);
       g.fill();
     }
-
-    const footprint = (x, z, w, d, wall, roof) => {
+    const footprint = (x, z, w, d) => {
       const px = X(x);
       const py = Y(z);
-      g.fillStyle = "rgba(40, 36, 28, 0.28)";
-      g.fillRect(px + 2, py + 2.4, w * s, d * s);
-      g.fillStyle = wall;
+      g.fillStyle = "rgba(0, 0, 0, 0.45)";
+      g.fillRect(px + 2.2, py + 3, w * s, d * s);
+      g.fillStyle = "#24362f";
       g.fillRect(px, py, w * s, d * s);
-      g.fillStyle = roof;
-      g.fillRect(px + 1.2, py + 1.2, w * s - 2.4, d * s * 0.46);
-      g.strokeStyle = "rgba(255,255,255,0.55)";
+      g.fillStyle = "#3e5c4c";
+      g.fillRect(px + s * 0.35, py + s * 0.35, w * s - s * 0.7, d * s * 0.42);
+      g.strokeStyle = "rgba(255,255,255,0.28)";
       g.lineWidth = 1;
-      g.strokeRect(px + 0.6, py + 0.6, w * s - 1.2, d * s - 1.2);
+      g.strokeRect(px + 0.5, py + 0.5, Math.max(1, w * s - 1), Math.max(1, d * s - 1));
     };
     if (quarry) {
-      g.fillStyle = "#8d735c";
+      g.fillStyle = "#8a8178";
       g.beginPath();
       g.arc(X(quarry.x), Y(quarry.z), (quarry.rim || 13) * s, 0, Math.PI * 2);
       g.fill();
-      g.fillStyle = "#5c4a3c";
+      g.fillStyle = "#3a342e";
       g.beginPath();
       g.arc(X(quarry.x), Y(quarry.z), (quarry.floor || 4) * s, 0, Math.PI * 2);
       g.fill();
     }
-    if (importAt) footprint(importAt.x - 4.6, importAt.z - 3.6, 9.2, 7.2, "#f6f1e6", "#b86a3d");
-    if (marketAt) footprint(marketAt.x - 4.1, marketAt.z - 3.2, 8.2, 6.4, "#f4f7f2", "#1f8a4c");
-    if (pescaAt) footprint(pescaAt.x - 4.1, pescaAt.z - 3.2, 8.2, 6.4, "#e7f3f8", "#1d6f9a");
-    if (atelierAt) footprint(atelierAt.x - 4.1, atelierAt.z - 3.2, 8.2, 6.4, "#f6e4ec", "#6e2438");
-    footprint(-5.6, 50.9, 11.2, 14.2, "#f6f1e8", "#c45a3a");
-    footprint(-40.5, 13.5, 13, 9.4, "#f3eee6", "#b55238");
-    footprint(27.5, -22.9, 13, 9.4, "#eef3f6", "#4d6474");
-    g.fillStyle = "#9fd0e4";
+    if (importAt) footprint(importAt.x - 4.6, importAt.z - 3.6, 9.2, 7.2);
+    if (marketAt) footprint(marketAt.x - 4.1, marketAt.z - 3.2, 8.2, 6.4);
+    if (pescaAt) footprint(pescaAt.x - 4.1, pescaAt.z - 3.2, 8.2, 6.4);
+    if (atelierAt) footprint(atelierAt.x - 4.1, atelierAt.z - 3.2, 8.2, 6.4);
+    footprint(-5.6, 50.9, 11.2, 14.2);
+    footprint(-40.5, 13.5, 13, 9.4);
+    footprint(27.5, -22.9, 13, 9.4);
+    g.fillStyle = "#49b7e8";
     g.beginPath();
-    g.arc(X(0), Y(0), 4.4 * s, 0, Math.PI * 2);
+    g.arc(X(0), Y(0), 4.2 * s, 0, Math.PI * 2);
     g.fill();
-    g.strokeStyle = "#f4efe6";
-    g.lineWidth = 1.4 * s;
-    g.stroke();
+    const mark = (x, z, color) => {
+      const r = Math.max(6.5, 3.4 * s);
+      g.fillStyle = "#07090b";
+      g.beginPath();
+      g.arc(X(x), Y(z), r + 1.8, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = color;
+      g.beginPath();
+      g.arc(X(x), Y(z), r, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = "rgba(255,255,255,0.75)";
+      g.beginPath();
+      g.arc(X(x) - r * 0.28, Y(z) - r * 0.28, r * 0.26, 0, Math.PI * 2);
+      g.fill();
+    };
+    if (marketAt) mark(marketAt.x, marketAt.z, "#3ddc6a");
+    if (pescaAt) mark(pescaAt.x, pescaAt.z, "#3aa0ff");
+    if (atelierAt) mark(atelierAt.x, atelierAt.z, "#ff5fa2");
+    if (importAt) mark(importAt.x, importAt.z, "#ff9f1a");
+    if (quarry) mark(quarry.x, quarry.z, "#d0d4d8");
+    mark(0, 58, "#ffe14a");
+    mark(-34, 18, "#ffe14a");
+    mark(34, -18, "#ffe14a");
+  }
 
-    const p = player.group.position;
+  function drawArrow(g, x, y, rot, sc) {
     g.save();
-    g.translate(X(p.x), Y(p.z));
-    g.rotate(player.group.rotation.y + Math.PI);
-    g.fillStyle = "#1c1c1c";
+    g.translate(x, y);
+    g.rotate(rot);
+    g.scale(sc, sc);
+    g.fillStyle = "#111418";
     g.beginPath();
-    g.moveTo(0, 9);
-    g.lineTo(-6.2, -7);
-    g.lineTo(6.2, -7);
+    g.moveTo(0, -12);
+    g.lineTo(7.2, 9);
+    g.lineTo(0, 4);
+    g.lineTo(-7.2, 9);
     g.closePath();
     g.fill();
-    g.fillStyle = "#ffe27a";
+    g.fillStyle = "#ffffff";
     g.beginPath();
-    g.moveTo(0, 7);
-    g.lineTo(-4.4, -5.2);
-    g.lineTo(4.4, -5.2);
+    g.moveTo(0, -9);
+    g.lineTo(5.2, 7);
+    g.lineTo(0, 2.4);
+    g.lineTo(-5.2, 7);
     g.closePath();
     g.fill();
     g.restore();
-    g.fillStyle = "#2a241c";
-    g.font = `700 ${Math.max(11, size * 0.055)}px Georgia, serif`;
+  }
+
+  function drawMap() {
+    if (!baseMap) {
+      const sheet = document.createElement("canvas");
+      sheet.width = 768;
+      sheet.height = 768;
+      paintCity(sheet.getContext("2d"), 768);
+      baseMap = sheet;
+    }
+    const size = mapBig ? 640 : 180;
+    if (mapEl.width !== size) {
+      mapEl.width = size;
+      mapEl.height = size;
+    }
+    const g = mapCtx;
+    const p = player.group.position;
+    const scale = baseMap.width / MAP_SPAN;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, size, size);
+    if (!mapBig) {
+      g.save();
+      g.beginPath();
+      g.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
+      g.clip();
+      g.translate(size / 2, size / 2);
+      g.rotate(-player.group.rotation.y);
+      g.translate(-size / 2, -size / 2);
+      const src = 78 * scale;
+      const cx = (p.x + MAP_SPAN / 2) * scale;
+      const cy = (p.z + MAP_SPAN / 2) * scale;
+      g.drawImage(baseMap, cx - src / 2, cy - src / 2, src, src, 0, 0, size, size);
+      g.restore();
+      g.save();
+      g.beginPath();
+      g.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
+      g.clip();
+      const cone = g.createLinearGradient(size / 2, size / 2, size / 2, size * 0.08);
+      cone.addColorStop(0, "rgba(255,255,255,0.24)");
+      cone.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = cone;
+      g.beginPath();
+      g.moveTo(size / 2, size / 2 + 4);
+      g.lineTo(size * 0.3, size * 0.08);
+      g.lineTo(size * 0.7, size * 0.08);
+      g.closePath();
+      g.fill();
+      g.restore();
+      drawArrow(g, size / 2, size / 2, 0, 1);
+      const phi = -player.group.rotation.y;
+      g.fillStyle = "#f7f4ea";
+      g.font = "700 13px Outfit, Segoe UI, sans-serif";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.fillText("N", size / 2 + Math.sin(phi) * (size / 2 - 16), size / 2 - Math.cos(phi) * (size / 2 - 16));
+      const shade = g.createRadialGradient(size / 2, size / 2, size * 0.4, size / 2, size / 2, size * 0.52);
+      shade.addColorStop(0, "rgba(0,0,0,0)");
+      shade.addColorStop(1, "rgba(0,0,0,0.5)");
+      g.fillStyle = shade;
+      g.beginPath();
+      g.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+      g.fill();
+      return;
+    }
+    g.drawImage(baseMap, 0, 0, size, size);
+    const X = (x) => ((x + MAP_SPAN / 2) / MAP_SPAN) * size;
+    const Y = (z) => ((z + MAP_SPAN / 2) / MAP_SPAN) * size;
+    drawArrow(g, X(p.x), Y(p.z), player.group.rotation.y, size / 480);
+    g.fillStyle = "#f7f4ea";
+    g.font = "700 20px Outfit, Segoe UI, sans-serif";
     g.textAlign = "center";
-    g.fillText("N", size / 2, 18);
-    const shade = g.createRadialGradient(size / 2, size / 2, size * 0.28, size / 2, size / 2, size * 0.52);
-    shade.addColorStop(0, "rgba(0,0,0,0)");
-    shade.addColorStop(1, "rgba(28, 18, 8, 0.38)");
-    g.fillStyle = shade;
-    g.fillRect(0, 0, size, size);
-    g.restore();
+    g.textBaseline = "middle";
+    g.fillText("N", size / 2, 20);
+    g.strokeStyle = "rgba(255,255,255,0.16)";
+    g.lineWidth = 2;
+    g.strokeRect(10, 10, size - 20, size - 20);
   }
 
   function clockAt(date) {
@@ -957,7 +1054,7 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
       const uz = Math.sin(phi) * Math.cos(az);
       const sun = skyU.sunPosition.value;
       sun.set(ux, uy, uz).multiplyScalar(1200000);
-      sky.visible = day > 0.05;
+      sky.visible = !plainSky && day > 0.05;
       skyU.turbidity.value = 1.1 + weather.cover * 1.4 + night * 0.15;
       skyU.rayleigh.value = 0.02 + day * 1.08 - weather.cover * 0.1;
       skyU.mieCoefficient.value = 0.001 + weather.cover * 0.004 + (h > 16 && h < 20 ? 0.006 : 0);
@@ -992,7 +1089,7 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
       });
       for (let i = 0; i < worldLampOrder.length; i++) {
         const bulb = streetLights[worldLampOrder[i]];
-        const on = i < 8 && lamp > 0.02;
+        const on = i < lampLimit && lamp > 0.02;
         bulb.visible = on;
         if (on) bulb.intensity = 220 * lamp;
       }
@@ -1001,7 +1098,7 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
       if (day > 0.15 && day < 0.72 && h < 10) fogColor.lerp(dawnTint, 0.45);
       if (day > 0.15 && day < 0.72 && h > 16) fogColor.lerp(duskTint, 0.45);
       scene.fog.color.copy(fogColor);
-      scene.fog.density = THREE.MathUtils.lerp(0.00115, 0.0021, day);
+      scene.fog.density = THREE.MathUtils.lerp(0.00115, 0.0021, day) * (plainSky ? 1.55 : 1);
       scene.background.copy(night > 0.45 ? nightSky : fogColor);
       const starFade = 1 - THREE.MathUtils.smoothstep(elev, -0.28, 0.06);
       starFields.forEach((field, i) => {
@@ -1031,7 +1128,7 @@ export function createWorld({ scene, renderer, player, sky, sunLight, hemiLight,
         const fall = (weather.kind === "drizzle" ? 7 : 16) * dt;
         const px = player.group.position.x;
         const pz = player.group.position.z;
-        for (let i = 0; i < rainCount; i++) {
+        for (let i = 0; i < rainDraw; i++) {
           rainPos[i * 3] += weather.wind * dt * 3;
           rainPos[i * 3 + 1] -= fall * (weather.kind === "storm" ? 1.35 : 1);
           if (rainPos[i * 3 + 1] < 0) resetDrop(rainPos, i, false);
