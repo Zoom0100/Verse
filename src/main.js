@@ -8,6 +8,7 @@ import { createCity } from "./city.js";
 import { createWorld } from "./world.js";
 import { mountSuit, suitIds } from "./suits.js";
 import { softGeo } from "./soft.js";
+import { createChunkCull, createPixelView } from "./pixelView.js";
 
 const CDN = "https://threejs.org/examples/models/gltf";
 const MODELS = {
@@ -35,6 +36,7 @@ const phone =
   (tgBoot && ["ios", "android", "android_x"].includes(tgBoot.platform)) ||
   /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (window.matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 1000);
+const pixel = new URLSearchParams(location.search).get("pixel") !== "0";
 function fitRatio() {
   if (!phone) return Math.min(window.devicePixelRatio, 1.5);
   // After cutting world load, aim ~720px long side (was 512: ugly, still heavy).
@@ -42,17 +44,17 @@ function fitRatio() {
   return Math.min(1.15, 720 / long);
 }
 const renderer = new THREE.WebGLRenderer({
-  antialias: !phone,
+  antialias: !phone && !pixel,
   powerPreference: "high-performance",
   stencil: false,
   depth: true,
 });
-renderer.setPixelRatio(fitRatio());
+renderer.setPixelRatio(pixel ? 1 : fitRatio());
 renderer.setSize(window.innerWidth, window.innerHeight, false);
-renderer.shadowMap.enabled = !phone;
+renderer.shadowMap.enabled = !phone && !pixel;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = pixel ? 1 : 1.15;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
@@ -65,8 +67,13 @@ if (!phone) {
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   pmrem.dispose();
 }
+if (pixel) scene.fog = new THREE.FogExp2(0xb7cbe0, 0.012);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, phone ? 72 : 400);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, pixel ? 110 : phone ? 72 : 400);
+const pixelView = pixel ? createPixelView(renderer) : null;
+if (pixelView) pixelView.fit(window.innerWidth, window.innerHeight);
+let chunkCull = null;
+let cullClock = 0;
 if (phone) document.body.classList.add("phone");
 const clock = new THREE.Clock();
 const loader = new GLTFLoader();
@@ -315,7 +322,7 @@ function addLights(sunDir) {
 
   const sun = new THREE.DirectionalLight(0xfff1d6, 2.15);
   sun.position.copy(sunDir).multiplyScalar(60);
-  sun.castShadow = !phone;
+  sun.castShadow = !phone && !pixel;
   sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.near = 1;
   sun.shadow.camera.far = 120;
@@ -5456,6 +5463,7 @@ async function boot() {
   }
 
   document.getElementById("boot").classList.add("hidden");
+  refreshChunkCull();
 }
 
 function setPlayerAnim(moving, running) {
@@ -7571,7 +7579,16 @@ function tick() {
   }
   updateDrops(now);
   updateCamera();
-  renderer.render(scene, camera);
+  if (pixelView) {
+    cullClock += dt;
+    if (chunkCull && cullClock > 0.25) {
+      cullClock = 0;
+      chunkCull.update(player.group.position.x, player.group.position.z);
+    }
+    pixelView.render(scene, camera);
+  } else {
+    renderer.render(scene, camera);
+  }
   whereAt += dt;
   if (whereAt > 2) {
     whereAt = 0;
@@ -7798,8 +7815,9 @@ function resizeView() {
   const height = Math.max(1, gameHeight());
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(fitRatio());
+  renderer.setPixelRatio(pixel ? 1 : fitRatio());
   renderer.setSize(width, height, false);
+  if (pixelView) pixelView.fit(width, height);
   placeChat();
 }
 
@@ -7964,6 +7982,18 @@ runBtn.addEventListener("pointerup", (e) => {
 });
 clock.start();
 renderHotbar();
+
+function refreshChunkCull() {
+  if (!pixel) return;
+  if (!chunkCull) chunkCull = createChunkCull(scene);
+  const roots = [player.group];
+  for (const n of npcs) if (n.pivot) roots.push(n.pivot);
+  for (const a of animals) if (a.pivot) roots.push(a.pivot);
+  for (const b of birds) if (b.root) roots.push(b.root);
+  chunkCull.refresh(roots);
+  chunkCull.update(player.group.position.x, player.group.position.z);
+}
+refreshChunkCull();
 
 (async () => {
   await fetchMaintenance();
