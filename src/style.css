@@ -1277,6 +1277,12 @@ body.stinky #stink {
   pointer-events: none;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
 }
+body.aiming #reticle {
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+}
 #aim-btn, #fire-btn, #reload-btn, #run-btn, #hop-btn {
   position: fixed;
   right: max(16px, env(safe-area-inset-right));
