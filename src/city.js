@@ -2206,6 +2206,15 @@ export function createCity(api) {
   gun.rotation.set(0.2, 0.1, -1.2);
   gun.visible = false;
   let gunAim = false;
+  let viewGun = false;
+  const viewAnchor = new THREE.Group();
+  const viewAim = new THREE.Vector3();
+  const viewLight = new THREE.PointLight(0xfff3e2, 6, 1.6, 2);
+  viewLight.layers.set(1);
+  viewLight.position.set(0, 0.06, -0.2);
+  viewAnchor.add(viewLight);
+  gun.traverse((obj) => obj.layers.enable(1));
+  scene.add(viewAnchor);
   cig.visible = false;
   let riding = false;
   let driving = false;
@@ -5408,6 +5417,35 @@ export function createCity(api) {
     aimGun(on) {
       gunAim = !!on && gun.visible;
     },
+    holdViewGun(cam, on) {
+      const eye = cam || camera;
+      const next = !!on && gun.visible && !riding && !driving && !!eye;
+      if (next) {
+        viewAnchor.position.copy(eye.position);
+        viewAnchor.quaternion.copy(eye.quaternion);
+        viewAnchor.updateMatrixWorld(true);
+        if (gun.parent !== viewAnchor) viewAnchor.add(gun);
+        if (hero) hero.visible = false;
+        gun.visible = true;
+        eye.layers.enable(1);
+        const aspect = eye.aspect > 0 ? eye.aspect : 1;
+        const wide = aspect >= 1;
+        gun.scale.setScalar(wide ? 1.18 : 1.02);
+        gun.position.set(THREE.MathUtils.clamp(0.11 * aspect, 0.055, 0.18), wide ? -0.11 : -0.09, wide ? -0.72 : -0.64);
+        viewAim.set(0, 0.03, -1.25).applyMatrix4(viewAnchor.matrixWorld);
+        gun.lookAt(viewAim);
+        gun.rotateZ(wide ? -0.2 : -0.14);
+        viewGun = true;
+        return;
+      }
+      if (!viewGun) return;
+      viewGun = false;
+      if (hero) hero.visible = true;
+      gun.scale.setScalar(1);
+      if (bones.RightHand && gun.parent !== bones.RightHand) bones.RightHand.add(gun);
+      gun.position.copy(gunRestPos);
+      gun.quaternion.copy(gunRest);
+    },
     muzzle(pos, dir) {
       if (!gun.visible) return false;
       muzzleTip.updateWorldMatrix(true, false);
@@ -5421,6 +5459,7 @@ export function createCity(api) {
         gun.visible = false;
         return;
       }
+      if (viewGun) return;
       const going = gunAim && bones.RightArm && bones.RightHand ? 1 : 0;
       const step = 1 - Math.exp(-9 * Math.max(dt || 0, 0));
       aimBlend += (going - aimBlend) * step;

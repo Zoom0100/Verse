@@ -5574,11 +5574,12 @@ function gunAiming() {
 }
 
 function clampLookPitch(v) {
-  return THREE.MathUtils.clamp(v, gunAiming() ? -0.5 : -0.08, gunAiming() ? 0.9 : 0.62);
+  return THREE.MathUtils.clamp(v, gunAiming() ? -1.05 : -0.08, gunAiming() ? 1.25 : 0.62);
 }
 
 function updateCamera() {
   if (wardrobeOpen) {
+    city.holdViewGun?.(camera, false);
     const w = window.innerWidth;
     const h = window.innerHeight;
     camera.setViewOffset(w, h, w * 0.18, 0, w, h);
@@ -5601,6 +5602,7 @@ function updateCamera() {
   camera.clearViewOffset();
   const decor = city.decorView ? city.decorView() : null;
   if (decor) {
+    city.holdViewGun?.(camera, false);
     if (!decorOrbit) decorOrbit = { yaw: 0, pitch: 0.92, dist: 13 };
     camera.up.set(0, 1, 0);
     const flat = Math.cos(decorOrbit.pitch) * decorOrbit.dist;
@@ -5620,22 +5622,19 @@ function updateCamera() {
   const overShoulder = gunAiming();
   if (overShoulder) {
     const p = clampLookPitch(pitch);
-    const back = 1.65;
-    const shoulder = 0.48;
-    const ahead = 14;
     const fx = -Math.sin(yaw);
     const fz = -Math.cos(yaw);
-    const rx = -Math.cos(yaw);
-    const rz = Math.sin(yaw);
+    const eye = player.group.position.y + 1.58;
+    const look = 0.28 - p;
     camGoal.set(
-      player.group.position.x - fx * back + rx * shoulder,
-      player.group.position.y + 1.42 + Math.sin(p) * 0.28,
-      player.group.position.z - fz * back + rz * shoulder,
+      player.group.position.x + fx * 0.08,
+      eye,
+      player.group.position.z + fz * 0.08,
     );
     camLook.set(
-      player.group.position.x + fx * ahead - rx * 0.18,
-      player.group.position.y + 1.28 + Math.sin(p) * ahead * 0.42,
-      player.group.position.z + fz * ahead - rz * 0.18,
+      camGoal.x + fx * 10,
+      eye + Math.sin(look) * 10,
+      camGoal.z + fz * 10,
     );
   } else {
     const p = THREE.MathUtils.clamp(pitch, -0.08, 0.62);
@@ -5648,18 +5647,20 @@ function updateCamera() {
     );
     camLook.set(player.group.position.x, player.group.position.y + 0.9, player.group.position.z);
   }
-  if (room && room.minX < room.maxX && room.minZ < room.maxZ) {
+  if (!overShoulder && room && room.minX < room.maxX && room.minZ < room.maxZ) {
     camGoal.x = THREE.MathUtils.clamp(camGoal.x, room.minX, room.maxX);
     camGoal.z = THREE.MathUtils.clamp(camGoal.z, room.minZ, room.maxZ);
   }
-  if (!camReady) {
+  if (!camReady || overShoulder) {
     camera.position.copy(camGoal);
     camReady = true;
   } else {
-    camera.position.lerp(camGoal, overShoulder ? 0.28 : gatePassage() ? 0.42 : 0.16);
+    camera.position.lerp(camGoal, gatePassage() ? 0.42 : 0.16);
   }
   camera.lookAt(camLook);
-  const wantFov = overShoulder ? 48 : 60;
+  city.holdViewGun?.(camera, overShoulder);
+  if (levelBadge) levelBadge.visible = !overShoulder;
+  const wantFov = overShoulder ? 50 : 60;
   if (Math.abs(camera.fov - wantFov) > 0.2) {
     camera.fov = THREE.MathUtils.lerp(camera.fov, wantFov, 0.2);
     camera.updateProjectionMatrix();
