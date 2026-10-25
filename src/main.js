@@ -8,6 +8,7 @@ import { createCity } from "./city.js";
 import { createWorld } from "./world.js";
 import { mountSuit, suitIds } from "./suits.js";
 import { softGeo } from "./soft.js";
+import { applyPixelFrame } from "./pixelView.js";
 
 const CDN = "https://threejs.org/examples/models/gltf";
 const MODELS = {
@@ -35,19 +36,13 @@ const phone =
   (tgBoot && ["ios", "android", "android_x"].includes(tgBoot.platform)) ||
   /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (window.matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 1000);
-function fitRatio() {
-  if (!phone) return Math.min(window.devicePixelRatio, 1.5);
-  // After cutting world load, aim ~720px long side (was 512: ugly, still heavy).
-  const long = Math.max(window.innerWidth, window.innerHeight, 1);
-  return Math.min(1.15, 720 / long);
-}
 const renderer = new THREE.WebGLRenderer({
-  antialias: !phone,
+  antialias: false,
   powerPreference: "high-performance",
   stencil: false,
   depth: true,
 });
-renderer.setPixelRatio(fitRatio());
+renderer.setPixelRatio(1);
 renderer.setSize(window.innerWidth, window.innerHeight, false);
 renderer.shadowMap.enabled = !phone;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -7798,8 +7793,7 @@ function resizeView() {
   const height = Math.max(1, gameHeight());
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setPixelRatio(fitRatio());
-  renderer.setSize(width, height, false);
+  applyPixelFrame(renderer, width, height, phone);
   placeChat();
 }
 

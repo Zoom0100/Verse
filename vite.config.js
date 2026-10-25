@@ -104,6 +104,7 @@ export default defineConfig(({ mode }) => {
         input: {
           main: resolve(__dirname, "index.html"),
           archive3d: resolve(__dirname, "index-3d.html"),
+          lite: resolve(__dirname, "lite.html"),
         },
       },
     },

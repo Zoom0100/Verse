@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <title>Zoom Verse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="boot">
+      <div class="boot-card">
+        <div class="brand">Zoom Verse</div>
+        <p>Lite · caricamento…</p>
+      </div>
+    </div>
+
+    <div id="maint-note" class="hidden"></div>
+    <div id="maintenance" class="hidden">
+      <div class="panel">
+        <h1>Zoom Verse</h1>
+        <p id="maintenance-text">Zoom Verse is in maintenance. Only the owner can enter.</p>
+      </div>
+    </div>
+
+    <canvas id="game" width="320" height="180" aria-label="Zoom Verse Lite"></canvas>
+
+    <div id="hud">
+      <div id="vitals">
+        <div class="vital"><span>Vita</span><b><i id="vital-life"></i></b></div>
+        <div class="vital"><span>Fame</span><b><i id="vital-hunger"></i></b></div>
+        <div class="vital"><span>Sete</span><b><i id="vital-thirst"></i></b></div>
+      </div>
+      <div id="zc-chip">Z <strong id="zc-amount">0</strong></div>
+      <div id="place-banner"></div>
+      <div id="toast"></div>
+      <div id="hint">WASD · E agisci · Shift corri</div>
+
+      <div id="stick"><i id="stick-knob"></i></div>
+      <button id="act-btn" class="hidden" type="button">Agisci</button>
+      <button id="run-btn" type="button">Corri</button>
+      <button id="phone-toggle" type="button">Telefono</button>
+
+      <button id="menu-btn" type="button" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+      <div id="menu" class="hidden">
+        <button type="button" data-open="phone">Telefono</button>
+        <button type="button" data-open="market">Mercato</button>
+        <button type="button" data-open="help">Aiuto</button>
+        <button type="button" data-open="3d">Mondo 3D (archivio)</button>
+      </div>
+
+      <div id="phone" class="hidden">
+        <div id="handset">
+          <header id="phone-status"><span id="phone-clock">12:00</span><span>ZV</span></header>
+          <div id="phone-body"></div>
+          <button id="phone-back" type="button" aria-label="Chiudi"></button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/lite/main.js"></script>
+  </body>
+</html>
